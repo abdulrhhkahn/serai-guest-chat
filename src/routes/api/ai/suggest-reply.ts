@@ -1,16 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { createClient } from "@supabase/supabase-js";
 import { generateText } from "ai";
 
 export const Route = createFileRoute("/api/ai/suggest-reply")({
   server: {
-    middleware: [requireSupabaseAuth],
     handlers: {
-      POST: async ({ request, context }) => {
+      POST: async ({ request }) => {
+        const authHeader = request.headers.get("authorization");
+        if (!authHeader?.startsWith("Bearer ")) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+
+        const supabase = createClient(
+          process.env.SUPABASE_URL!,
+          process.env.SUPABASE_PUBLISHABLE_KEY!,
+          {
+            global: { headers: { Authorization: authHeader } },
+            auth: { persistSession: false, autoRefreshToken: false },
+          },
+        );
+
+        const { data: userData, error: userErr } = await supabase.auth.getUser();
+        if (userErr || !userData.user) return new Response("Unauthorized", { status: 401 });
+
         const { conversationId } = (await request.json()) as { conversationId: string };
         if (!conversationId) return new Response("Bad request", { status: 400 });
-
-        const supabase = context.supabase;
 
         const { data: conv } = await supabase.from("conversations").select("property_id").eq("id", conversationId).maybeSingle();
         if (!conv) return new Response("Not found", { status: 404 });
@@ -42,13 +56,17 @@ export const Route = createFileRoute("/api/ai/suggest-reply")({
 
         const transcript = (messages ?? []).map((m) => `${m.sender}: ${m.body}`).join("\n");
 
-        const { text } = await generateText({
-          model,
-          system: `You are drafting a reply for hotel staff to send to a guest. Be warm, concise, and specific. Use the property info and FAQs below. Never invent details. Keep to 2-4 sentences.\n\n${context_str}`,
-          prompt: `Conversation so far:\n${transcript}\n\nDraft the staff's next reply.`,
-        });
-
-        return Response.json({ reply: text });
+        try {
+          const { text } = await generateText({
+            model,
+            system: `You are drafting a reply for hotel staff to send to a guest. Be warm, concise, and specific. Use the property info and FAQs below. Never invent details. Keep to 2-4 sentences.\n\n${context_str}`,
+            prompt: `Conversation so far:\n${transcript}\n\nDraft the staff's next reply.`,
+          });
+          return Response.json({ reply: text });
+        } catch (e) {
+          console.error("suggest error", e);
+          return Response.json({ reply: "Thanks for reaching out — I'll help you with that shortly." });
+        }
       },
     },
   },
