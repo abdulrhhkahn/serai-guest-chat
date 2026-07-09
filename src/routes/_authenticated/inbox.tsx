@@ -98,12 +98,24 @@ function InboxPage() {
     setLoadingSuggestion(true);
     setSuggestion(null);
     try {
+      const { data: sess } = await supabase.auth.getSession();
       const res = await fetch("/api/ai/suggest-reply", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sess.session?.access_token ?? ""}`,
+        },
         body: JSON.stringify({ conversationId: activeId }),
       });
       const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed");
+      setSuggestion(json.reply);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Suggestion failed");
+    } finally {
+      setLoadingSuggestion(false);
+    }
+  }
       if (!res.ok) throw new Error(json.error || "Failed");
       setSuggestion(json.reply);
     } catch (e) {
