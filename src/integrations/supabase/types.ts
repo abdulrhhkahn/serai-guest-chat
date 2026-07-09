@@ -14,16 +14,288 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      checkins: {
+        Row: {
+          arrival_date: string | null
+          booking_reference: string | null
+          created_at: string
+          departure_date: string | null
+          guest_email: string | null
+          guest_name: string
+          guest_phone: string | null
+          id: string
+          id_document_url: string | null
+          num_guests: number | null
+          property_id: string
+          signature_url: string | null
+          status: string
+        }
+        Insert: {
+          arrival_date?: string | null
+          booking_reference?: string | null
+          created_at?: string
+          departure_date?: string | null
+          guest_email?: string | null
+          guest_name: string
+          guest_phone?: string | null
+          id?: string
+          id_document_url?: string | null
+          num_guests?: number | null
+          property_id: string
+          signature_url?: string | null
+          status?: string
+        }
+        Update: {
+          arrival_date?: string | null
+          booking_reference?: string | null
+          created_at?: string
+          departure_date?: string | null
+          guest_email?: string | null
+          guest_name?: string
+          guest_phone?: string | null
+          id?: string
+          id_document_url?: string | null
+          num_guests?: number | null
+          property_id?: string
+          signature_url?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkins_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          channel: string
+          created_at: string
+          guest_contact: string | null
+          guest_name: string | null
+          id: string
+          last_message_at: string | null
+          property_id: string
+          status: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          guest_contact?: string | null
+          guest_name?: string | null
+          id?: string
+          last_message_at?: string | null
+          property_id: string
+          status?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          guest_contact?: string | null
+          guest_name?: string | null
+          id?: string
+          last_message_at?: string | null
+          property_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      faqs: {
+        Row: {
+          answer: string
+          category: string | null
+          created_at: string
+          id: string
+          property_id: string
+          question: string
+        }
+        Insert: {
+          answer: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          property_id: string
+          question: string
+        }
+        Update: {
+          answer?: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          property_id?: string
+          question?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faqs_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          approved: boolean
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          is_ai_suggestion: boolean
+          sender: string
+        }
+        Insert: {
+          approved?: boolean
+          body: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          is_ai_suggestion?: boolean
+          sender: string
+        }
+        Update: {
+          approved?: boolean
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          is_ai_suggestion?: boolean
+          sender?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      properties: {
+        Row: {
+          address: string | null
+          brand_color: string
+          checkin_time: string | null
+          checkout_time: string | null
+          created_at: string
+          id: string
+          logo_url: string | null
+          name: string
+          slug: string
+          welcome_message: string | null
+          wifi_password: string | null
+          wifi_ssid: string | null
+        }
+        Insert: {
+          address?: string | null
+          brand_color?: string
+          checkin_time?: string | null
+          checkout_time?: string | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+          slug: string
+          welcome_message?: string | null
+          wifi_password?: string | null
+          wifi_ssid?: string | null
+        }
+        Update: {
+          address?: string | null
+          brand_color?: string
+          checkin_time?: string | null
+          checkout_time?: string | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          slug?: string
+          welcome_message?: string | null
+          wifi_password?: string | null
+          wifi_ssid?: string | null
+        }
+        Relationships: []
+      }
+      staff_profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          property_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id: string
+          property_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          property_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_profiles_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_staff_property_id: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      property_id_for_conversation: {
+        Args: { _conv_id: string }
+        Returns: string
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "agent"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +422,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "agent"],
+    },
   },
 } as const
