@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StaySlugRouteImport } from './routes/stay.$slug'
 import { Route as CheckinSlugRouteImport } from './routes/checkin.$slug'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedKnowledgeRouteImport } from './routes/_authenticated/knowledge'
@@ -31,6 +32,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StaySlugRoute = StaySlugRouteImport.update({
+  id: '/stay/$slug',
+  path: '/stay/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckinSlugRoute = CheckinSlugRouteImport.update({
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/knowledge': typeof AuthenticatedKnowledgeRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/checkin/$slug': typeof CheckinSlugRoute
+  '/stay/$slug': typeof StaySlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/knowledge': typeof AuthenticatedKnowledgeRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/checkin/$slug': typeof CheckinSlugRoute
+  '/stay/$slug': typeof StaySlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/_authenticated/knowledge': typeof AuthenticatedKnowledgeRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/checkin/$slug': typeof CheckinSlugRoute
+  '/stay/$slug': typeof StaySlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/settings'
     | '/checkin/$slug'
+    | '/stay/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/settings'
     | '/checkin/$slug'
+    | '/stay/$slug'
   id:
     | '__root__'
     | '/'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/_authenticated/knowledge'
     | '/_authenticated/settings'
     | '/checkin/$slug'
+    | '/stay/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -135,6 +147,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   CheckinSlugRoute: typeof CheckinSlugRoute
+  StaySlugRoute: typeof StaySlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stay/$slug': {
+      id: '/stay/$slug'
+      path: '/stay/$slug'
+      fullPath: '/stay/$slug'
+      preLoaderRoute: typeof StaySlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkin/$slug': {
@@ -229,6 +249,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   CheckinSlugRoute: CheckinSlugRoute,
+  StaySlugRoute: StaySlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
