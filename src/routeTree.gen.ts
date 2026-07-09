@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedKnowledgeRouteImport } from './routes/_authenticated/knowledge'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCheckinsRouteImport } from './routes/_authenticated/checkins'
@@ -29,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedKnowledgeRoute = AuthenticatedKnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
   id: '/inbox',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/checkins': typeof AuthenticatedCheckinsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/inbox': typeof AuthenticatedInboxRoute
+  '/knowledge': typeof AuthenticatedKnowledgeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/checkins': typeof AuthenticatedCheckinsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/inbox': typeof AuthenticatedInboxRoute
+  '/knowledge': typeof AuthenticatedKnowledgeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,12 +76,19 @@ export interface FileRoutesById {
   '/_authenticated/checkins': typeof AuthenticatedCheckinsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
+  '/_authenticated/knowledge': typeof AuthenticatedKnowledgeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/checkins' | '/dashboard' | '/inbox'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/checkins'
+    | '/dashboard'
+    | '/inbox'
+    | '/knowledge'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/checkins' | '/dashboard' | '/inbox'
+  to: '/' | '/auth' | '/checkins' | '/dashboard' | '/inbox' | '/knowledge'
   id:
     | '__root__'
     | '/'
@@ -82,6 +97,7 @@ export interface FileRouteTypes {
     | '/_authenticated/checkins'
     | '/_authenticated/dashboard'
     | '/_authenticated/inbox'
+    | '/_authenticated/knowledge'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -113,6 +129,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/knowledge': {
+      id: '/_authenticated/knowledge'
+      path: '/knowledge'
+      fullPath: '/knowledge'
+      preLoaderRoute: typeof AuthenticatedKnowledgeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/inbox': {
       id: '/_authenticated/inbox'
       path: '/inbox'
@@ -141,12 +164,14 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCheckinsRoute: typeof AuthenticatedCheckinsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
+  AuthenticatedKnowledgeRoute: typeof AuthenticatedKnowledgeRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCheckinsRoute: AuthenticatedCheckinsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
+  AuthenticatedKnowledgeRoute: AuthenticatedKnowledgeRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
