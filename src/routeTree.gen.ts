@@ -9,38 +9,189 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StaySlugRouteImport } from './routes/stay.$slug'
+import { Route as CheckinSlugRouteImport } from './routes/checkin.$slug'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedKnowledgeRouteImport } from './routes/_authenticated/knowledge'
+import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCheckinsRouteImport } from './routes/_authenticated/checkins'
+import { Route as ApiAiSuggestReplyRouteImport } from './routes/api/ai/suggest-reply'
+import { Route as ApiAiConciergeRouteImport } from './routes/api/ai/concierge'
 
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StaySlugRoute = StaySlugRouteImport.update({
+  id: '/stay/$slug',
+  path: '/stay/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckinSlugRoute = CheckinSlugRouteImport.update({
+  id: '/checkin/$slug',
+  path: '/checkin/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedKnowledgeRoute = AuthenticatedKnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedCheckinsRoute = AuthenticatedCheckinsRouteImport.update({
+  id: '/checkins',
+  path: '/checkins',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const ApiAiSuggestReplyRoute = ApiAiSuggestReplyRouteImport.update({
+  id: '/api/ai/suggest-reply',
+  path: '/api/ai/suggest-reply',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiConciergeRoute = ApiAiConciergeRouteImport.update({
+  id: '/api/ai/concierge',
+  path: '/api/ai/concierge',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/checkins': typeof AuthenticatedCheckinsRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/inbox': typeof AuthenticatedInboxRoute
+  '/knowledge': typeof AuthenticatedKnowledgeRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/checkin/$slug': typeof CheckinSlugRoute
+  '/stay/$slug': typeof StaySlugRoute
+  '/api/ai/concierge': typeof ApiAiConciergeRoute
+  '/api/ai/suggest-reply': typeof ApiAiSuggestReplyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/checkins': typeof AuthenticatedCheckinsRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/inbox': typeof AuthenticatedInboxRoute
+  '/knowledge': typeof AuthenticatedKnowledgeRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/checkin/$slug': typeof CheckinSlugRoute
+  '/stay/$slug': typeof StaySlugRoute
+  '/api/ai/concierge': typeof ApiAiConciergeRoute
+  '/api/ai/suggest-reply': typeof ApiAiSuggestReplyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/checkins': typeof AuthenticatedCheckinsRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/inbox': typeof AuthenticatedInboxRoute
+  '/_authenticated/knowledge': typeof AuthenticatedKnowledgeRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/checkin/$slug': typeof CheckinSlugRoute
+  '/stay/$slug': typeof StaySlugRoute
+  '/api/ai/concierge': typeof ApiAiConciergeRoute
+  '/api/ai/suggest-reply': typeof ApiAiSuggestReplyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/checkins'
+    | '/dashboard'
+    | '/inbox'
+    | '/knowledge'
+    | '/settings'
+    | '/checkin/$slug'
+    | '/stay/$slug'
+    | '/api/ai/concierge'
+    | '/api/ai/suggest-reply'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/checkins'
+    | '/dashboard'
+    | '/inbox'
+    | '/knowledge'
+    | '/settings'
+    | '/checkin/$slug'
+    | '/stay/$slug'
+    | '/api/ai/concierge'
+    | '/api/ai/suggest-reply'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/checkins'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/inbox'
+    | '/_authenticated/knowledge'
+    | '/_authenticated/settings'
+    | '/checkin/$slug'
+    | '/stay/$slug'
+    | '/api/ai/concierge'
+    | '/api/ai/suggest-reply'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
+  CheckinSlugRoute: typeof CheckinSlugRoute
+  StaySlugRoute: typeof StaySlugRoute
+  ApiAiConciergeRoute: typeof ApiAiConciergeRoute
+  ApiAiSuggestReplyRoute: typeof ApiAiSuggestReplyRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +199,100 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/stay/$slug': {
+      id: '/stay/$slug'
+      path: '/stay/$slug'
+      fullPath: '/stay/$slug'
+      preLoaderRoute: typeof StaySlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkin/$slug': {
+      id: '/checkin/$slug'
+      path: '/checkin/$slug'
+      fullPath: '/checkin/$slug'
+      preLoaderRoute: typeof CheckinSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/knowledge': {
+      id: '/_authenticated/knowledge'
+      path: '/knowledge'
+      fullPath: '/knowledge'
+      preLoaderRoute: typeof AuthenticatedKnowledgeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/inbox': {
+      id: '/_authenticated/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof AuthenticatedInboxRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/checkins': {
+      id: '/_authenticated/checkins'
+      path: '/checkins'
+      fullPath: '/checkins'
+      preLoaderRoute: typeof AuthenticatedCheckinsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/ai/suggest-reply': {
+      id: '/api/ai/suggest-reply'
+      path: '/api/ai/suggest-reply'
+      fullPath: '/api/ai/suggest-reply'
+      preLoaderRoute: typeof ApiAiSuggestReplyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ai/concierge': {
+      id: '/api/ai/concierge'
+      path: '/api/ai/concierge'
+      fullPath: '/api/ai/concierge'
+      preLoaderRoute: typeof ApiAiConciergeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedCheckinsRoute: typeof AuthenticatedCheckinsRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
+  AuthenticatedKnowledgeRoute: typeof AuthenticatedKnowledgeRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedCheckinsRoute: AuthenticatedCheckinsRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedInboxRoute: AuthenticatedInboxRoute,
+  AuthenticatedKnowledgeRoute: AuthenticatedKnowledgeRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
+  CheckinSlugRoute: CheckinSlugRoute,
+  StaySlugRoute: StaySlugRoute,
+  ApiAiConciergeRoute: ApiAiConciergeRoute,
+  ApiAiSuggestReplyRoute: ApiAiSuggestReplyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
