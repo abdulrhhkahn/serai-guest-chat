@@ -19,6 +19,7 @@ import { Route as AuthenticatedKnowledgeRouteImport } from './routes/_authentica
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCheckinsRouteImport } from './routes/_authenticated/checkins'
+import { Route as ApiAiConciergeRouteImport } from './routes/api/ai/concierge'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -69,6 +70,11 @@ const AuthenticatedCheckinsRoute = AuthenticatedCheckinsRouteImport.update({
   path: '/checkins',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiAiConciergeRoute = ApiAiConciergeRouteImport.update({
+  id: '/api/ai/concierge',
+  path: '/api/ai/concierge',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/checkin/$slug': typeof CheckinSlugRoute
   '/stay/$slug': typeof StaySlugRoute
+  '/api/ai/concierge': typeof ApiAiConciergeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/checkin/$slug': typeof CheckinSlugRoute
   '/stay/$slug': typeof StaySlugRoute
+  '/api/ai/concierge': typeof ApiAiConciergeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/checkin/$slug': typeof CheckinSlugRoute
   '/stay/$slug': typeof StaySlugRoute
+  '/api/ai/concierge': typeof ApiAiConciergeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/checkin/$slug'
     | '/stay/$slug'
+    | '/api/ai/concierge'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/checkin/$slug'
     | '/stay/$slug'
+    | '/api/ai/concierge'
   id:
     | '__root__'
     | '/'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/checkin/$slug'
     | '/stay/$slug'
+    | '/api/ai/concierge'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -148,6 +160,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CheckinSlugRoute: typeof CheckinSlugRoute
   StaySlugRoute: typeof StaySlugRoute
+  ApiAiConciergeRoute: typeof ApiAiConciergeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -222,6 +235,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCheckinsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/ai/concierge': {
+      id: '/api/ai/concierge'
+      path: '/api/ai/concierge'
+      fullPath: '/api/ai/concierge'
+      preLoaderRoute: typeof ApiAiConciergeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -250,6 +270,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CheckinSlugRoute: CheckinSlugRoute,
   StaySlugRoute: StaySlugRoute,
+  ApiAiConciergeRoute: ApiAiConciergeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
