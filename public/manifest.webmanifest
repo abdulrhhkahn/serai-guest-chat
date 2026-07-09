@@ -1,0 +1,12 @@
+{
+  "name": "Serai — Guest Services",
+  "short_name": "Serai",
+  "description": "Mobile check-in and guest concierge for independent hotels.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f3ec",
+  "theme_color": "#0b6b75",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "any", "type": "image/x-icon" }
+  ]
+}
