@@ -56,7 +56,7 @@ function SettingsPage() {
     setSaving(true);
     const { error } = await supabase.from("properties").update({
       name: form.name,
-      brand_color: form.brand_color,
+      brand_color: form.brand_color ?? undefined,
       address: form.address,
       wifi_ssid: form.wifi_ssid,
       wifi_password: form.wifi_password,
