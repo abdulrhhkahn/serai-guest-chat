@@ -116,14 +116,6 @@ function InboxPage() {
       setLoadingSuggestion(false);
     }
   }
-      if (!res.ok) throw new Error(json.error || "Failed");
-      setSuggestion(json.reply);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Suggestion failed");
-    } finally {
-      setLoadingSuggestion(false);
-    }
-  }
 
   const active = conversations?.find((c) => c.id === activeId);
 
