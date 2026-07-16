@@ -26,19 +26,22 @@ export const Route = createFileRoute("/api/ai/concierge")({
 
         const apiKey = process.env.LOVABLE_API_KEY;
 
-        // Graceful fallback: no LLM configured yet
-        if (!apiKey) {
+        async function flagForStaff(body: string) {
           await supabaseAdmin.from("messages").insert({
             conversation_id: conversationId,
             sender: "ai",
-            body: "Thanks for your message! A team member will reply shortly.",
-            is_ai_suggestion: false,
+            body,
             approved: true,
           });
           await supabaseAdmin.from("conversations")
-            .update({ last_message_at: new Date().toISOString(), status: "open" })
+            .update({ last_message_at: new Date().toISOString(), status: "open", needs_staff: true })
             .eq("id", conversationId);
-          return Response.json({ ok: true, fallback: true });
+        }
+
+        // Graceful fallback: no LLM configured yet
+        if (!apiKey) {
+          await flagForStaff("Thanks for your message! A team member will reply shortly.");
+          return Response.json({ ok: true, uncertain: true, fallback: true });
         }
 
         try {
@@ -60,7 +63,7 @@ export const Route = createFileRoute("/api/ai/concierge")({
 
           const { text } = await generateText({
             model,
-            system: `You are a warm, concise concierge for ${prop?.name ?? "this hotel"}. Answer guest questions using ONLY the property info and FAQs below. If you don't have enough info, reply: "Let me get a team member to help." Keep replies under 3 sentences, friendly, no emojis.\n\n${context}`,
+            system: `You are a warm, concise concierge for ${prop?.name ?? "this hotel"}. Answer guest questions using ONLY the property info and FAQs below. If you don't have enough info, reply EXACTLY: "Let me get a team member to help." Keep replies under 3 sentences, friendly, no emojis.\n\n${context}`,
             prompt: question,
           });
 
@@ -70,22 +73,20 @@ export const Route = createFileRoute("/api/ai/concierge")({
             conversation_id: conversationId,
             sender: "ai",
             body: text,
-            is_ai_suggestion: false,
             approved: true,
           });
           await supabaseAdmin.from("conversations")
-            .update({ last_message_at: new Date().toISOString(), status: uncertain ? "open" : "open" })
+            .update({
+              last_message_at: new Date().toISOString(),
+              status: "open",
+              ...(uncertain ? { needs_staff: true } : {}),
+            })
             .eq("id", conversationId);
-          return Response.json({ ok: true });
+          return Response.json({ ok: true, uncertain });
         } catch (e) {
           console.error("concierge error", e);
-          await supabaseAdmin.from("messages").insert({
-            conversation_id: conversationId,
-            sender: "ai",
-            body: "Let me get a team member to help you with that.",
-            approved: true,
-          });
-          return Response.json({ ok: true, error: true });
+          await flagForStaff("Let me get a team member to help you with that.");
+          return Response.json({ ok: true, uncertain: true, error: true });
         }
       },
     },
