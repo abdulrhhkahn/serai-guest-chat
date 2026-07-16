@@ -139,7 +139,12 @@ function InboxPage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-medium truncate">{c.guest_name || "Guest"}</div>
-                  <span className={`h-2 w-2 rounded-full ${c.status === "open" ? "bg-emerald-500" : "bg-muted"}`} />
+                  <div className="flex items-center gap-1.5">
+                    {c.needs_staff && (
+                      <span className="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-900 border border-amber-200 rounded-full px-1.5 py-0.5">Needs staff</span>
+                    )}
+                    <span className={`h-2 w-2 rounded-full ${c.status === "open" ? "bg-emerald-500" : "bg-muted"}`} />
+                  </div>
                 </div>
                 <div className="text-xs text-muted-foreground truncate mt-0.5">{c.guest_contact ?? "web chat"}</div>
                 {c.last_message_at && (
