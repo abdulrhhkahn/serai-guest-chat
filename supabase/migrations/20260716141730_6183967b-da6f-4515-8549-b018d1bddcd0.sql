@@ -1,0 +1,1 @@
+ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS needs_staff boolean NOT NULL DEFAULT false;

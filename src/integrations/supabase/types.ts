@@ -78,6 +78,7 @@ export type Database = {
           guest_name: string | null
           id: string
           last_message_at: string | null
+          needs_staff: boolean
           property_id: string
           status: string
         }
@@ -88,6 +89,7 @@ export type Database = {
           guest_name?: string | null
           id?: string
           last_message_at?: string | null
+          needs_staff?: boolean
           property_id: string
           status?: string
         }
@@ -98,6 +100,7 @@ export type Database = {
           guest_name?: string | null
           id?: string
           last_message_at?: string | null
+          needs_staff?: boolean
           property_id?: string
           status?: string
         }
