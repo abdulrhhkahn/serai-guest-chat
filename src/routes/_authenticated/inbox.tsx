@@ -88,7 +88,7 @@ function InboxPage() {
       approved: true,
     });
     if (error) return toast.error(error.message);
-    await supabase.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", activeId);
+    await supabase.from("conversations").update({ last_message_at: new Date().toISOString(), needs_staff: false }).eq("id", activeId);
     setDraft("");
     setSuggestion(null);
     qc.invalidateQueries({ queryKey: ["messages", activeId] });
