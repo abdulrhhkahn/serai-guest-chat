@@ -20,6 +20,7 @@ type Conversation = {
   status: string;
   last_message_at: string | null;
   property_id: string;
+  needs_staff: boolean | null;
 };
 
 type Message = {
