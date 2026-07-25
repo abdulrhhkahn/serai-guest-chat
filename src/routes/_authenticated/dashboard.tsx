@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, ClipboardList, MessageSquare, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, MessageSquare, Users, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -24,6 +24,29 @@ function Dashboard() {
         arrivals: arrivals.count ?? 0,
         pending: pending.count ?? 0,
         open: open.count ?? 0,
+      };
+    },
+  });
+
+  const { data: replyStats } = useQuery({
+    queryKey: ["reply-stats"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString();
+      const { data } = await supabase
+        .from("messages")
+        .select("sender, created_at")
+        .in("sender", ["ai", "staff"])
+        .gte("created_at", since);
+      const rows = data ?? [];
+      const ai = rows.filter((r) => r.sender === "ai").length;
+      const staff = rows.filter((r) => r.sender === "staff").length;
+      const total = ai + staff;
+      return {
+        ai,
+        staff,
+        total,
+        aiPct: total ? Math.round((ai / total) * 100) : 0,
+        staffPct: total ? Math.round((staff / total) * 100) : 0,
       };
     },
   });
@@ -53,6 +76,39 @@ function Dashboard() {
         <Kpi label="Open conversations" value={stats?.open ?? 0} icon={<MessageSquare className="h-4 w-4" />} />
         <Kpi label="Guests expected" value={todaysGuests?.reduce((s, g) => s + (g.num_guests ?? 1), 0) ?? 0} icon={<Users className="h-4 w-4" />} />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-4 w-4 text-primary" /> Reply mix · last 30 days
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!replyStats?.total ? (
+            <p className="text-sm text-muted-foreground py-4">No guest replies yet.</p>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <div className="text-3xl font-serif">{replyStats.aiPct}%</div>
+                  <div className="text-xs text-muted-foreground">answered by AI</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl font-serif">{replyStats.staffPct}%</div>
+                  <div className="text-xs text-muted-foreground">by staff</div>
+                </div>
+              </div>
+              <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div className="bg-primary" style={{ width: `${replyStats.aiPct}%` }} />
+                <div className="bg-amber-400" style={{ width: `${replyStats.staffPct}%` }} />
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {replyStats.ai} AI · {replyStats.staff} staff · {replyStats.total} total replies
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>Today's arrivals</CardTitle></CardHeader>
