@@ -59,7 +59,7 @@ function StayHub() {
           ) : <div className="h-10 w-10 rounded-lg" style={{ background: brand }} />}
           <div>
             <div className="font-serif text-xl">{property.name}</div>
-            <div className="text-xs text-muted-foreground">Guest hub</div>
+            <div className="text-xs text-muted-foreground">Guest hub{offline ? " · offline" : ""}</div>
           </div>
         </div>
 
