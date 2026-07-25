@@ -7,13 +7,33 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Send, Wifi, Clock, MapPin } from "lucide-react";
 
+type StayProperty = { id: string; name: string; slug: string; logo_url: string | null; brand_color: string | null; address: string | null; wifi_ssid: string | null; wifi_password: string | null; checkin_time: string | null; checkout_time: string | null; welcome_message: string | null };
+
 export const Route = createFileRoute("/stay/$slug")({
   loader: async ({ params }) => {
-    const { data } = await supabase.from("properties")
-      .select("id,name,slug,logo_url,brand_color,address,wifi_ssid,wifi_password,checkin_time,checkout_time,welcome_message")
-      .eq("slug", params.slug).maybeSingle();
-    if (!data) throw notFound();
-    return { property: data };
+    try {
+      const { data } = await supabase.from("properties")
+        .select("id,name,slug,logo_url,brand_color,address,wifi_ssid,wifi_password,checkin_time,checkout_time,welcome_message")
+        .eq("slug", params.slug).maybeSingle();
+      if (!data) {
+        // Try cached copy if offline / not found
+        if (typeof localStorage !== "undefined") {
+          const cached = localStorage.getItem(`serai-stay-${params.slug}`);
+          if (cached) return { property: JSON.parse(cached) as StayProperty, offline: true };
+        }
+        throw notFound();
+      }
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(`serai-stay-${params.slug}`, JSON.stringify(data));
+      }
+      return { property: data as StayProperty, offline: false };
+    } catch (e) {
+      if (typeof localStorage !== "undefined") {
+        const cached = localStorage.getItem(`serai-stay-${params.slug}`);
+        if (cached) return { property: JSON.parse(cached) as StayProperty, offline: true };
+      }
+      throw e;
+    }
   },
   head: ({ loaderData }) => ({
     meta: [
