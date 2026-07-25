@@ -47,7 +47,7 @@ export const Route = createFileRoute("/stay/$slug")({
 type Msg = { id: string; sender: string; body: string; created_at: string };
 
 function StayHub() {
-  const { property } = Route.useLoaderData() as { property: { id: string; name: string; logo_url: string | null; brand_color: string | null; address: string | null; wifi_ssid: string | null; wifi_password: string | null; checkin_time: string | null; checkout_time: string | null; welcome_message: string | null } };
+  const { property, offline } = Route.useLoaderData() as { property: StayProperty; offline: boolean };
   const brand = property.brand_color ?? "#0b6b75";
 
   return (
