@@ -139,6 +139,10 @@ function RootComponent() {
     return () => sub.subscription.unsubscribe();
   }, [router, queryClient]);
 
+  useEffect(() => {
+    void import("../lib/pwa-register").then((m) => m.registerServiceWorker());
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
