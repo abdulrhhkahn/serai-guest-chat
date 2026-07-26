@@ -17,12 +17,16 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+const DEMO_EMAIL = "demo@serai.test";
+const DEMO_PASSWORD = "demo1234";
+
 function AuthPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
@@ -48,6 +52,39 @@ function AuthPage() {
     if (error) return toast.error(error.message);
     toast.success("Account created. You're signed in.");
     navigate({ to: "/dashboard" });
+  }
+
+  async function enterAsDemo() {
+    setDemoLoading(true);
+    try {
+      let { error } = await supabase.auth.signInWithPassword({
+        email: DEMO_EMAIL,
+        password: DEMO_PASSWORD,
+      });
+      if (error) {
+        const { error: signUpErr } = await supabase.auth.signUp({
+          email: DEMO_EMAIL,
+          password: DEMO_PASSWORD,
+          options: {
+            emailRedirectTo: `${window.location.origin}/dashboard`,
+            data: { full_name: "Demo Staff" },
+          },
+        });
+        if (signUpErr) throw signUpErr;
+        const retry = await supabase.auth.signInWithPassword({
+          email: DEMO_EMAIL,
+          password: DEMO_PASSWORD,
+        });
+        error = retry.error;
+      }
+      if (error) throw error;
+      toast.success("Signed in as demo staff");
+      navigate({ to: "/dashboard" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Demo login failed");
+    } finally {
+      setDemoLoading(false);
+    }
   }
 
   return (
