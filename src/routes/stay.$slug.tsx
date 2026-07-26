@@ -114,14 +114,40 @@ function Panel({ icon, title, children }: { icon?: React.ReactNode; title: strin
   );
 }
 
+type PendingMsg = { local_id: string; body: string; created_at: string };
+
 function GuestChat({ propertyId, brand }: { propertyId: string; brand: string }) {
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(() =>
+    typeof localStorage !== "undefined" ? localStorage.getItem(`serai-conv-${propertyId}`) : null
+  );
   const [name, setName] = useState<string>(() => (typeof localStorage !== "undefined" ? localStorage.getItem("serai-guest-name") || "" : ""));
   const [namePrompted, setNamePrompted] = useState(!!name);
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [pending, setPending] = useState<PendingMsg[]>(() => {
+    if (typeof localStorage === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem(`serai-queue-${propertyId}`) || "[]"); } catch { return []; }
+  });
+  const [online, setOnline] = useState<boolean>(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const syncingRef = useRef(false);
+
+  // persist queue
+  useEffect(() => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(`serai-queue-${propertyId}`, JSON.stringify(pending));
+    }
+  }, [pending, propertyId]);
+
+  // online/offline listeners
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -137,38 +163,73 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
     return () => { supabase.removeChannel(ch); };
   }, [conversationId]);
 
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages]);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, pending]);
+
+  async function ensureConversation(): Promise<string> {
+    if (conversationId) return conversationId;
+    const { data, error } = await supabase.from("conversations").insert({
+      property_id: propertyId,
+      guest_name: name || null,
+      status: "open",
+      last_message_at: new Date().toISOString(),
+    }).select("id").single();
+    if (error) throw error;
+    setConversationId(data.id);
+    if (typeof localStorage !== "undefined") localStorage.setItem(`serai-conv-${propertyId}`, data.id);
+    return data.id;
+  }
+
+  async function pushOne(body: string, convId: string) {
+    const { error: msgErr } = await supabase.from("messages").insert({ conversation_id: convId, sender: "guest", body, source: "manual" });
+    if (msgErr) throw msgErr;
+    await supabase.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", convId);
+    fetch("/api/ai/concierge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationId: convId, propertyId, question: body }),
+    }).catch(() => {});
+  }
+
+  // flush queue when we come back online
+  useEffect(() => {
+    if (!online || pending.length === 0 || syncingRef.current) return;
+    syncingRef.current = true;
+    (async () => {
+      try {
+        const convId = await ensureConversation();
+        for (const item of [...pending]) {
+          try {
+            await pushOne(item.body, convId);
+            setPending((prev) => prev.filter((p) => p.local_id !== item.local_id));
+          } catch {
+            break; // stop on failure, retry later
+          }
+        }
+      } catch { /* ignore */ }
+      finally { syncingRef.current = false; }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, pending.length]);
 
   async function send() {
     if (!text.trim()) return;
+    const body = text.trim();
+    setText("");
+
+    if (!online) {
+      setPending((prev) => [...prev, { local_id: crypto.randomUUID(), body, created_at: new Date().toISOString() }]);
+      toast.info("Saved — will send when you're back online");
+      return;
+    }
+
     setSending(true);
     try {
-      let convId = conversationId;
-      if (!convId) {
-        const { data, error } = await supabase.from("conversations").insert({
-          property_id: propertyId,
-          guest_name: name || null,
-          status: "open",
-          last_message_at: new Date().toISOString(),
-        }).select("id").single();
-        if (error) throw error;
-        convId = data.id;
-        setConversationId(convId);
-      }
-      const body = text.trim();
-      setText("");
-      const { error: msgErr } = await supabase.from("messages").insert({ conversation_id: convId, sender: "guest", body });
-      if (msgErr) throw msgErr;
-      await supabase.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", convId);
-
-      // fire-and-forget AI concierge
-      fetch("/api/ai/concierge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: convId, propertyId, question: body }),
-      }).catch(() => {});
+      const convId = await ensureConversation();
+      await pushOne(body, convId);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to send");
+      // network failed mid-send: queue it
+      setPending((prev) => [...prev, { local_id: crypto.randomUUID(), body, created_at: new Date().toISOString() }]);
+      toast.error(e instanceof Error ? `${e.message} — queued for retry` : "Queued for retry");
     } finally {
       setSending(false);
     }
@@ -191,8 +252,13 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
 
   return (
     <div className="flex flex-col h-[65vh] rounded-2xl border border-border bg-card overflow-hidden">
+      <div className={`px-3 py-1.5 text-[11px] flex items-center gap-1.5 border-b border-border ${online ? "text-emerald-700 bg-emerald-50" : "text-amber-800 bg-amber-50"}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${online ? "bg-emerald-500" : "bg-amber-500"}`} />
+        {online ? "Online" : "Offline — messages will send when reconnected"}
+        {pending.length > 0 && <span className="ml-auto">{pending.length} pending</span>}
+      </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2">
-        {messages.length === 0 && (
+        {messages.length === 0 && pending.length === 0 && (
           <div className="text-center text-sm text-muted-foreground py-8">
             Ask us anything about your stay — wifi, breakfast, local tips.
           </div>
@@ -206,9 +272,17 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
             </div>
           </div>
         ))}
+        {pending.map((p) => (
+          <div key={p.local_id} className="flex justify-end">
+            <div className="max-w-[80%] rounded-2xl px-3.5 py-2 text-sm text-white opacity-60" style={{ background: brand }}>
+              {p.body}
+              <div className="text-[10px] mt-0.5 opacity-80">Pending — will send when online</div>
+            </div>
+          </div>
+        ))}
       </div>
       <div className="border-t border-border p-2 flex gap-2">
-        <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a message…" onKeyDown={(e) => { if (e.key === "Enter") send(); }} />
+        <Input value={text} onChange={(e) => setText(e.target.value)} placeholder={online ? "Type a message…" : "Offline — will queue"} onKeyDown={(e) => { if (e.key === "Enter") send(); }} />
         <Button size="icon" onClick={send} disabled={sending || !text.trim()} style={{ background: brand, color: "white" }}>
           <Send className="h-4 w-4" />
         </Button>

@@ -157,7 +157,10 @@ export type Database = {
           created_at: string
           id: string
           is_ai_suggestion: boolean
+          original_draft: string | null
           sender: string
+          sender_user_id: string | null
+          source: string | null
         }
         Insert: {
           approved?: boolean
@@ -166,7 +169,10 @@ export type Database = {
           created_at?: string
           id?: string
           is_ai_suggestion?: boolean
+          original_draft?: string | null
           sender: string
+          sender_user_id?: string | null
+          source?: string | null
         }
         Update: {
           approved?: boolean
@@ -175,7 +181,10 @@ export type Database = {
           created_at?: string
           id?: string
           is_ai_suggestion?: boolean
+          original_draft?: string | null
           sender?: string
+          sender_user_id?: string | null
+          source?: string | null
         }
         Relationships: [
           {
@@ -231,6 +240,44 @@ export type Database = {
           wifi_ssid?: string | null
         }
         Relationships: []
+      }
+      response_templates: {
+        Row: {
+          body: string
+          category: string | null
+          created_at: string
+          id: string
+          property_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          property_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          property_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "response_templates_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_profiles: {
         Row: {
