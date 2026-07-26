@@ -75,6 +75,7 @@ export const Route = createFileRoute("/api/ai/concierge")({
             sender: "ai",
             body: text,
             approved: true,
+            source: "ai_direct",
           });
           await supabaseAdmin.from("conversations")
             .update({
