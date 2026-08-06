@@ -5,7 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Send, FileText, Users, History } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Sparkles, Send, FileText, Users, History, AlertTriangle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -62,6 +64,10 @@ function InboxPage() {
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [threshold, setThreshold] = useState(0.5);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const [queueMode, setQueueMode] = useState<"attention" | "all">("attention");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: conversations } = useQuery({
@@ -99,16 +105,28 @@ function InboxPage() {
       const { data: convs } = await supabase.from("conversations")
         .select("id, guest_name")
         .eq("status", "open");
-      if (!convs?.length) return [] as Array<{ conversation_id: string; guest_name: string | null; body: string }>;
+      type Row = { conversation_id: string; guest_name: string | null; body: string; last_guest_at: string | null; last_sender: string | null };
+      if (!convs?.length) return [] as Row[];
       const ids = convs.map((c) => c.id);
       const { data: msgs } = await supabase.from("messages")
         .select("conversation_id, body, sender, created_at")
         .in("conversation_id", ids)
-        .eq("sender", "guest")
         .order("created_at", { ascending: false });
-      const last = new Map<string, string>();
-      for (const m of msgs ?? []) if (!last.has(m.conversation_id)) last.set(m.conversation_id, m.body);
-      return convs.map((c) => ({ conversation_id: c.id, guest_name: c.guest_name, body: last.get(c.id) ?? "" }));
+      const lastGuest = new Map<string, { body: string; created_at: string }>();
+      const lastAny = new Map<string, string>();
+      for (const m of msgs ?? []) {
+        if (!lastAny.has(m.conversation_id)) lastAny.set(m.conversation_id, m.sender);
+        if (m.sender === "guest" && !lastGuest.has(m.conversation_id)) {
+          lastGuest.set(m.conversation_id, { body: m.body, created_at: m.created_at });
+        }
+      }
+      return convs.map((c) => ({
+        conversation_id: c.id,
+        guest_name: c.guest_name,
+        body: lastGuest.get(c.id)?.body ?? "",
+        last_guest_at: lastGuest.get(c.id)?.created_at ?? null,
+        last_sender: lastAny.get(c.id) ?? null,
+      })) as Row[];
     },
   });
 
@@ -138,14 +156,55 @@ function InboxPage() {
     return "";
   }, [messages]);
 
-  const similarOpen = useMemo(() => {
+  // All other open conversations scored against the active one, plus the staff-set threshold.
+  const scoredOpen = useMemo(() => {
     if (!lastGuestInActive || !allOpenLastGuest) return [];
     return allOpenLastGuest
       .filter((c) => c.conversation_id !== activeId && c.body)
       .map((c) => ({ ...c, score: similarity(lastGuestInActive, c.body) }))
-      .filter((c) => c.score >= 0.5)
       .sort((a, b) => b.score - a.score);
   }, [lastGuestInActive, allOpenLastGuest, activeId]);
+
+  const similarOpen = useMemo(
+    () => scoredOpen.filter((c) => c.score >= threshold),
+    [scoredOpen, threshold],
+  );
+
+  const approveTargets = useMemo(
+    () => similarOpen.filter((c) => !excluded.has(c.conversation_id)),
+    [similarOpen, excluded],
+  );
+
+  // Needs-attention queue: flagged / awaiting-guest-reply first, longest wait first.
+  const waitInfo = useMemo(() => {
+    const map = new Map<string, { waitingSince: string | null; awaiting: boolean }>();
+    for (const c of allOpenLastGuest ?? []) {
+      map.set(c.conversation_id, {
+        waitingSince: c.last_guest_at,
+        awaiting: c.last_sender === "guest",
+      });
+    }
+    return map;
+  }, [allOpenLastGuest]);
+
+  const attentionQueue = useMemo(() => {
+    const list = (conversations ?? []).map((c) => {
+      const info = waitInfo.get(c.id);
+      const flagged = !!c.needs_staff;
+      const awaiting = !!info?.awaiting;
+      const since = info?.waitingSince ?? c.last_message_at;
+      const waitedMs = since ? Date.now() - new Date(since).getTime() : 0;
+      return { conv: c, flagged, awaiting, since, waitedMs, priority: flagged ? 2 : awaiting ? 1 : 0 };
+    });
+    return list
+      .filter((r) => (queueMode === "all" ? true : r.priority > 0))
+      .sort((a, b) => (b.priority - a.priority) || (b.waitedMs - a.waitedMs));
+  }, [conversations, waitInfo, queueMode]);
+
+  const attentionCount = useMemo(
+    () => (conversations ?? []).filter((c) => c.needs_staff || waitInfo.get(c.id)?.awaiting).length,
+    [conversations, waitInfo],
+  );
 
   async function sendTo(conversationId: string, body: string, source: "manual" | "ai_draft_approved" | "ai_draft_edited" | "template", originalDraft?: string | null) {
     const { data: u } = await supabase.auth.getUser();
@@ -176,7 +235,7 @@ function InboxPage() {
 
   async function approveForAll(body: string, originalDraft: string | null) {
     if (!activeId) return;
-    const targets = [activeId, ...similarOpen.map((s) => s.conversation_id)];
+    const targets = [activeId, ...approveTargets.map((s) => s.conversation_id)];
     let sent = 0;
     for (const cid of targets) {
       try {
@@ -187,6 +246,8 @@ function InboxPage() {
     toast.success(`Sent to ${sent} conversation${sent === 1 ? "" : "s"}`);
     setDraft("");
     setSuggestion(null);
+    setPreviewOpen(false);
+    setExcluded(new Set());
     qc.invalidateQueries();
   }
 
