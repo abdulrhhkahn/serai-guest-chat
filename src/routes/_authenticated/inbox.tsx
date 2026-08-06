@@ -283,30 +283,51 @@ function InboxPage() {
         <div className="p-4 border-b border-border">
           <h2 className="font-serif text-xl">Inbox</h2>
           <p className="text-xs text-muted-foreground">{conversations?.length ?? 0} conversations</p>
+          <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setQueueMode("attention")}
+              className={`rounded-md px-2 py-1.5 transition ${queueMode === "attention" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+            >
+              Needs attention{attentionCount > 0 ? ` (${attentionCount})` : ""}
+            </button>
+            <button
+              type="button"
+              onClick={() => setQueueMode("all")}
+              className={`rounded-md px-2 py-1.5 transition ${queueMode === "all" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+            >
+              All
+            </button>
+          </div>
         </div>
-        {!conversations?.length ? (
-          <div className="p-6 text-sm text-muted-foreground text-center">No conversations yet.</div>
+        {!attentionQueue.length ? (
+          <div className="p-6 text-sm text-muted-foreground text-center">
+            {queueMode === "attention" ? "Nothing waiting on staff right now." : "No conversations yet."}
+          </div>
         ) : (
           <div className="divide-y divide-border">
-            {conversations.map((c) => (
+            {attentionQueue.map(({ conv: c, flagged, awaiting, since }) => (
               <button
                 key={c.id}
                 onClick={() => setActiveId(c.id)}
-                className={`w-full text-left p-4 hover:bg-accent transition ${activeId === c.id ? "bg-accent" : ""}`}
+                className={`w-full text-left p-4 hover:bg-accent transition ${activeId === c.id ? "bg-accent" : ""} ${flagged ? "border-l-2 border-l-amber-400" : ""}`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-medium truncate">{c.guest_name || "Guest"}</div>
                   <div className="flex items-center gap-1.5">
-                    {c.needs_staff && (
-                      <span className="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-900 border border-amber-200 rounded-full px-1.5 py-0.5">Needs staff</span>
+                    {flagged && (
+                      <span className="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-900 border border-amber-200 rounded-full px-1.5 py-0.5 inline-flex items-center gap-1">
+                        <AlertTriangle className="h-2.5 w-2.5" /> Needs staff
+                      </span>
                     )}
                     <span className={`h-2 w-2 rounded-full ${c.status === "open" ? "bg-emerald-500" : "bg-muted"}`} />
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground truncate mt-0.5">{c.guest_contact ?? "web chat"}</div>
-                {c.last_message_at && (
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: true })}
+                {since && (
+                  <div className={`text-[11px] mt-1 inline-flex items-center gap-1 ${awaiting || flagged ? "text-amber-700" : "text-muted-foreground"}`}>
+                    <Clock className="h-3 w-3" />
+                    {awaiting || flagged ? "waiting " : ""}{formatDistanceToNow(new Date(since), { addSuffix: !(awaiting || flagged) })}
                   </div>
                 )}
               </button>
@@ -314,6 +335,7 @@ function InboxPage() {
           </div>
         )}
       </aside>
+
 
       <section className="flex flex-col min-w-0">
         {!active ? (
@@ -356,21 +378,71 @@ function InboxPage() {
                     <Sparkles className="h-3 w-3" /> AI-suggested reply
                   </div>
                   <p className="text-sm text-blue-950 whitespace-pre-wrap">{suggestion}</p>
+
+                  <div className="mt-3 rounded-lg border border-blue-200 bg-white/60 p-2.5">
+                    <div className="flex items-center justify-between text-[11px] text-blue-900">
+                      <span>Similarity threshold</span>
+                      <span className="font-mono">{Math.round(threshold * 100)}%</span>
+                    </div>
+                    <Slider
+                      className="mt-2"
+                      min={20}
+                      max={100}
+                      step={5}
+                      value={[Math.round(threshold * 100)]}
+                      onValueChange={(v) => setThreshold((v[0] ?? 50) / 100)}
+                    />
+                    <div className="mt-1.5 flex items-center justify-between text-[11px] text-blue-900/80">
+                      <span>
+                        {similarOpen.length} matching conversation{similarOpen.length === 1 ? "" : "s"}
+                        {scoredOpen.length > 0 && ` of ${scoredOpen.length} open`}
+                      </span>
+                      {scoredOpen.length > 0 && (
+                        <button type="button" className="underline" onClick={() => setPreviewOpen((v) => !v)}>
+                          {previewOpen ? "Hide preview" : "Preview matches"}
+                        </button>
+                      )}
+                    </div>
+                    {previewOpen && (
+                      <div className="mt-2 max-h-44 overflow-y-auto space-y-1.5">
+                        {similarOpen.length === 0 ? (
+                          <p className="text-[11px] text-blue-900/70">No conversations match at this threshold.</p>
+                        ) : similarOpen.map((c) => {
+                          const checked = !excluded.has(c.conversation_id);
+                          return (
+                            <label key={c.conversation_id} className="flex items-start gap-2 rounded-md bg-white p-2 border border-blue-100 cursor-pointer">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(v) => setExcluded((prev) => {
+                                  const next = new Set(prev);
+                                  if (v) next.delete(c.conversation_id); else next.add(c.conversation_id);
+                                  return next;
+                                })}
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-medium truncate">{c.guest_name || "Guest"}</span>
+                                  <span className="text-[10px] font-mono text-blue-900/70">{Math.round(c.score * 100)}%</span>
+                                </span>
+                                <span className="block text-[11px] text-muted-foreground line-clamp-2">{c.body}</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Button size="sm" onClick={() => send(suggestion, "ai_draft_approved", suggestion)}>Approve &amp; send</Button>
-                    {similarOpen.length > 0 && (
+                    {approveTargets.length > 0 && (
                       <Button size="sm" variant="secondary" onClick={() => approveForAll(suggestion, suggestion)}>
-                        <Users className="h-3.5 w-3.5 mr-1" /> Approve for all similar ({similarOpen.length + 1})
+                        <Users className="h-3.5 w-3.5 mr-1" /> Approve for all similar ({approveTargets.length + 1})
                       </Button>
                     )}
                     <Button size="sm" variant="outline" onClick={() => { setDraft(suggestion); setSuggestion(null); }}>Edit</Button>
                     <Button size="sm" variant="ghost" onClick={() => setSuggestion(null)}>Dismiss</Button>
                   </div>
-                  {similarOpen.length > 0 && (
-                    <p className="text-[11px] text-blue-900/80 mt-2">
-                      {similarOpen.length} other open conversation{similarOpen.length === 1 ? "" : "s"} asked something similar.
-                    </p>
-                  )}
                 </Card>
               )}
               <div className="flex gap-2">
