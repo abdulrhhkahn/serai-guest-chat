@@ -114,7 +114,7 @@ function Panel({ icon, title, children }: { icon?: React.ReactNode; title: strin
   );
 }
 
-type PendingMsg = { local_id: string; body: string; created_at: string };
+type PendingMsg = { local_id: string; body: string; created_at: string; seq: number; attempts: number };
 
 function GuestChat({ propertyId, brand }: { propertyId: string; brand: string }) {
   const [conversationId, setConversationId] = useState<string | null>(() =>
@@ -123,20 +123,33 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   const [name, setName] = useState<string>(() => (typeof localStorage !== "undefined" ? localStorage.getItem("serai-guest-name") || "" : ""));
   const [namePrompted, setNamePrompted] = useState(!!name);
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [needsStaff, setNeedsStaff] = useState(false);
+  const [awaitingAi, setAwaitingAi] = useState(false);
   const [pending, setPending] = useState<PendingMsg[]>(() => {
     if (typeof localStorage === "undefined") return [];
-    try { return JSON.parse(localStorage.getItem(`serai-queue-${propertyId}`) || "[]"); } catch { return []; }
+    try {
+      const raw = JSON.parse(localStorage.getItem(`serai-queue-${propertyId}`) || "[]") as PendingMsg[];
+      return raw
+        .map((p, i) => ({ ...p, seq: typeof p.seq === "number" ? p.seq : i, attempts: p.attempts ?? 0 }))
+        .sort((a, b) => a.seq - b.seq);
+    } catch { return []; }
   });
   const [online, setOnline] = useState<boolean>(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const syncingRef = useRef(false);
+  const seqRef = useRef<number>(Date.now());
 
-  // persist queue
+  function nextSeq() {
+    seqRef.current = Math.max(seqRef.current + 1, Date.now());
+    return seqRef.current;
+  }
+
+  // persist queue (always ordered by seq)
   useEffect(() => {
     if (typeof localStorage !== "undefined") {
-      localStorage.setItem(`serai-queue-${propertyId}`, JSON.stringify(pending));
+      localStorage.setItem(`serai-queue-${propertyId}`, JSON.stringify([...pending].sort((a, b) => a.seq - b.seq)));
     }
   }, [pending, propertyId]);
 
@@ -152,13 +165,21 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   useEffect(() => {
     if (!conversationId) return;
     const loadInitial = async () => {
-      const { data } = await supabase.from("messages").select("*").eq("conversation_id", conversationId).order("created_at");
+      const { data } = await supabase.from("messages").select("*").eq("conversation_id", conversationId).order("created_at").order("id");
       setMessages((data ?? []) as Msg[]);
+      const { data: conv } = await supabase.from("conversations").select("needs_staff").eq("id", conversationId).maybeSingle();
+      setNeedsStaff(!!conv?.needs_staff);
     };
     loadInitial();
     const ch = supabase.channel(`guest-${conversationId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
-        (payload) => setMessages((prev) => [...prev, payload.new as Msg]))
+        (payload) => {
+          const m = payload.new as Msg;
+          setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+          if (m.sender !== "guest") setAwaitingAi(false);
+        })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations", filter: `id=eq.${conversationId}` },
+        (payload) => setNeedsStaff(!!(payload.new as { needs_staff?: boolean }).needs_staff))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [conversationId]);
@@ -167,6 +188,8 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
 
   async function ensureConversation(): Promise<string> {
     if (conversationId) return conversationId;
+    const existing = typeof localStorage !== "undefined" ? localStorage.getItem(`serai-conv-${propertyId}`) : null;
+    if (existing) { setConversationId(existing); return existing; }
     const { data, error } = await supabase.from("conversations").insert({
       property_id: propertyId,
       guest_name: name || null,
@@ -179,30 +202,49 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
     return data.id;
   }
 
-  async function pushOne(body: string, convId: string) {
-    const { error: msgErr } = await supabase.from("messages").insert({ conversation_id: convId, sender: "guest", body, source: "manual" });
-    if (msgErr) throw msgErr;
+  // Idempotent delivery: client_msg_id is unique, so a retry of an already-stored
+  // message is swallowed instead of duplicated. Returns true when delivered/known.
+  async function pushOne(item: { local_id: string; body: string; created_at: string }, convId: string): Promise<boolean> {
+    const { error } = await supabase.from("messages").insert({
+      conversation_id: convId,
+      sender: "guest",
+      body: item.body,
+      source: "manual",
+      client_msg_id: item.local_id,
+      created_at: item.created_at,
+    });
+    if (error) {
+      // 23505 = unique violation -> already delivered by an earlier attempt
+      if ((error as { code?: string }).code !== "23505") throw error;
+      return true;
+    }
     await supabase.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", convId);
+    setAwaitingAi(true);
     fetch("/api/ai/concierge", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId: convId, propertyId, question: body }),
+      body: JSON.stringify({ conversationId: convId, propertyId, question: item.body, clientMsgId: item.local_id }),
     }).catch(() => {});
+    return true;
   }
 
-  // flush queue when we come back online
+  // flush queue when we come back online — strictly in order, one at a time
   useEffect(() => {
     if (!online || pending.length === 0 || syncingRef.current) return;
     syncingRef.current = true;
     (async () => {
       try {
         const convId = await ensureConversation();
-        for (const item of [...pending]) {
+        const queue = [...pending].sort((a, b) => a.seq - b.seq);
+        for (const item of queue) {
+          if (typeof navigator !== "undefined" && !navigator.onLine) break;
           try {
-            await pushOne(item.body, convId);
+            await pushOne(item, convId);
             setPending((prev) => prev.filter((p) => p.local_id !== item.local_id));
           } catch {
-            break; // stop on failure, retry later
+            // keep order: stop at the first failure so later messages never overtake it
+            setPending((prev) => prev.map((p) => p.local_id === item.local_id ? { ...p, attempts: p.attempts + 1 } : p));
+            break;
           }
         }
       } catch { /* ignore */ }
@@ -211,29 +253,48 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, pending.length]);
 
+  function enqueue(body: string) {
+    setPending((prev) => [...prev, { local_id: crypto.randomUUID(), body, created_at: new Date().toISOString(), seq: nextSeq(), attempts: 0 }]);
+  }
+
   async function send() {
     if (!text.trim()) return;
     const body = text.trim();
     setText("");
 
-    if (!online) {
-      setPending((prev) => [...prev, { local_id: crypto.randomUUID(), body, created_at: new Date().toISOString() }]);
-      toast.info("Saved — will send when you're back online");
+    // If anything is still queued, append to the queue so ordering is preserved.
+    if (!online || pending.length > 0) {
+      enqueue(body);
+      toast.info(online ? "Queued behind earlier messages" : "Saved — will send when you're back online");
       return;
     }
 
     setSending(true);
+    const item = { local_id: crypto.randomUUID(), body, created_at: new Date().toISOString() };
     try {
       const convId = await ensureConversation();
-      await pushOne(body, convId);
+      await pushOne(item, convId);
     } catch (e) {
-      // network failed mid-send: queue it
-      setPending((prev) => [...prev, { local_id: crypto.randomUUID(), body, created_at: new Date().toISOString() }]);
+      // network failed mid-send: queue the SAME local_id so a retry can't duplicate
+      setPending((prev) => [...prev, { ...item, seq: nextSeq(), attempts: 1 }]);
       toast.error(e instanceof Error ? `${e.message} — queued for retry` : "Queued for retry");
     } finally {
       setSending(false);
     }
   }
+
+  const lastMessage = messages.length ? messages[messages.length - 1] : null;
+  const status: { tone: string; dot: string; label: string } = !online
+    ? { tone: "text-amber-800 bg-amber-50", dot: "bg-amber-500", label: "Offline — messages will send when reconnected" }
+    : needsStaff
+      ? { tone: "text-amber-800 bg-amber-50", dot: "bg-amber-500", label: "A team member will respond shortly" }
+      : awaitingAi || (lastMessage?.sender === "guest")
+        ? { tone: "text-sky-800 bg-sky-50", dot: "bg-sky-500", label: "Concierge is looking that up…" }
+        : lastMessage?.sender === "ai"
+          ? { tone: "text-sky-800 bg-sky-50", dot: "bg-sky-500", label: "Answered by AI concierge" }
+          : lastMessage?.sender === "staff"
+            ? { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Answered by our team" }
+            : { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Online" };
 
   if (!namePrompted) {
     return (
@@ -252,9 +313,9 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
 
   return (
     <div className="flex flex-col h-[65vh] rounded-2xl border border-border bg-card overflow-hidden">
-      <div className={`px-3 py-1.5 text-[11px] flex items-center gap-1.5 border-b border-border ${online ? "text-emerald-700 bg-emerald-50" : "text-amber-800 bg-amber-50"}`}>
-        <span className={`h-1.5 w-1.5 rounded-full ${online ? "bg-emerald-500" : "bg-amber-500"}`} />
-        {online ? "Online" : "Offline — messages will send when reconnected"}
+      <div className={`px-3 py-1.5 text-[11px] flex items-center gap-1.5 border-b border-border ${status.tone}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${status.dot} ${status.label.endsWith("…") ? "animate-pulse" : ""}`} />
+        {status.label}
         {pending.length > 0 && <span className="ml-auto">{pending.length} pending</span>}
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -268,6 +329,11 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
             <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${
               m.sender === "guest" ? "text-white" : "bg-muted"
             }`} style={m.sender === "guest" ? { background: brand } : undefined}>
+              {m.sender !== "guest" && (
+                <div className="text-[10px] uppercase tracking-wide mb-0.5 opacity-60">
+                  {m.sender === "ai" ? "AI concierge" : "Our team"}
+                </div>
+              )}
               {m.body}
             </div>
           </div>
@@ -276,7 +342,9 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
           <div key={p.local_id} className="flex justify-end">
             <div className="max-w-[80%] rounded-2xl px-3.5 py-2 text-sm text-white opacity-60" style={{ background: brand }}>
               {p.body}
-              <div className="text-[10px] mt-0.5 opacity-80">Pending — will send when online</div>
+              <div className="text-[10px] mt-0.5 opacity-80">
+                {p.attempts > 0 ? `Retrying (attempt ${p.attempts + 1})…` : online ? "Sending…" : "Pending — will send when online"}
+              </div>
             </div>
           </div>
         ))}
@@ -290,3 +358,4 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
     </div>
   );
 }
+

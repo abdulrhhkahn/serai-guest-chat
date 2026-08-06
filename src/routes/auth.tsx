@@ -26,7 +26,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
+  
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
@@ -54,38 +54,6 @@ function AuthPage() {
     navigate({ to: "/dashboard" });
   }
 
-  async function enterAsDemo() {
-    setDemoLoading(true);
-    try {
-      let { error } = await supabase.auth.signInWithPassword({
-        email: DEMO_EMAIL,
-        password: DEMO_PASSWORD,
-      });
-      if (error) {
-        const { error: signUpErr } = await supabase.auth.signUp({
-          email: DEMO_EMAIL,
-          password: DEMO_PASSWORD,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-            data: { full_name: "Demo Staff" },
-          },
-        });
-        if (signUpErr) throw signUpErr;
-        const retry = await supabase.auth.signInWithPassword({
-          email: DEMO_EMAIL,
-          password: DEMO_PASSWORD,
-        });
-        error = retry.error;
-      }
-      if (error) throw error;
-      toast.success("Signed in as demo staff");
-      navigate({ to: "/dashboard" });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Demo login failed");
-    } finally {
-      setDemoLoading(false);
-    }
-  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -147,24 +115,15 @@ function AuthPage() {
                 </form>
               </TabsContent>
             </Tabs>
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-              <div className="relative flex justify-center text-[11px] uppercase tracking-wide">
-                <span className="bg-card px-2 text-muted-foreground">or</span>
+            <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/40 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">For testing only</div>
+              <div className="mt-1 text-xs">
+                Email: <span className="font-mono">{DEMO_EMAIL}</span>
+              </div>
+              <div className="text-xs">
+                Password: <span className="font-mono">{DEMO_PASSWORD}</span>
               </div>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={enterAsDemo}
-              disabled={demoLoading}
-            >
-              {demoLoading ? "Entering demo…" : "Enter as demo staff"}
-            </Button>
-            <p className="mt-2 text-[11px] text-muted-foreground text-center">
-              Signs in as <span className="font-mono">demo@serai.test</span> — for testing only.
-            </p>
           </CardContent>
         </Card>
       </div>

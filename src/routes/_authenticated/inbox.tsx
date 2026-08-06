@@ -5,7 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Send, FileText, Users, History } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Sparkles, Send, FileText, Users, History, AlertTriangle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -62,6 +64,10 @@ function InboxPage() {
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [threshold, setThreshold] = useState(0.5);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const [queueMode, setQueueMode] = useState<"attention" | "all">("attention");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: conversations } = useQuery({
@@ -99,16 +105,28 @@ function InboxPage() {
       const { data: convs } = await supabase.from("conversations")
         .select("id, guest_name")
         .eq("status", "open");
-      if (!convs?.length) return [] as Array<{ conversation_id: string; guest_name: string | null; body: string }>;
+      type Row = { conversation_id: string; guest_name: string | null; body: string; last_guest_at: string | null; last_sender: string | null };
+      if (!convs?.length) return [] as Row[];
       const ids = convs.map((c) => c.id);
       const { data: msgs } = await supabase.from("messages")
         .select("conversation_id, body, sender, created_at")
         .in("conversation_id", ids)
-        .eq("sender", "guest")
         .order("created_at", { ascending: false });
-      const last = new Map<string, string>();
-      for (const m of msgs ?? []) if (!last.has(m.conversation_id)) last.set(m.conversation_id, m.body);
-      return convs.map((c) => ({ conversation_id: c.id, guest_name: c.guest_name, body: last.get(c.id) ?? "" }));
+      const lastGuest = new Map<string, { body: string; created_at: string }>();
+      const lastAny = new Map<string, string>();
+      for (const m of msgs ?? []) {
+        if (!lastAny.has(m.conversation_id)) lastAny.set(m.conversation_id, m.sender);
+        if (m.sender === "guest" && !lastGuest.has(m.conversation_id)) {
+          lastGuest.set(m.conversation_id, { body: m.body, created_at: m.created_at });
+        }
+      }
+      return convs.map((c) => ({
+        conversation_id: c.id,
+        guest_name: c.guest_name,
+        body: lastGuest.get(c.id)?.body ?? "",
+        last_guest_at: lastGuest.get(c.id)?.created_at ?? null,
+        last_sender: lastAny.get(c.id) ?? null,
+      })) as Row[];
     },
   });
 
@@ -138,14 +156,55 @@ function InboxPage() {
     return "";
   }, [messages]);
 
-  const similarOpen = useMemo(() => {
+  // All other open conversations scored against the active one, plus the staff-set threshold.
+  const scoredOpen = useMemo(() => {
     if (!lastGuestInActive || !allOpenLastGuest) return [];
     return allOpenLastGuest
       .filter((c) => c.conversation_id !== activeId && c.body)
       .map((c) => ({ ...c, score: similarity(lastGuestInActive, c.body) }))
-      .filter((c) => c.score >= 0.5)
       .sort((a, b) => b.score - a.score);
   }, [lastGuestInActive, allOpenLastGuest, activeId]);
+
+  const similarOpen = useMemo(
+    () => scoredOpen.filter((c) => c.score >= threshold),
+    [scoredOpen, threshold],
+  );
+
+  const approveTargets = useMemo(
+    () => similarOpen.filter((c) => !excluded.has(c.conversation_id)),
+    [similarOpen, excluded],
+  );
+
+  // Needs-attention queue: flagged / awaiting-guest-reply first, longest wait first.
+  const waitInfo = useMemo(() => {
+    const map = new Map<string, { waitingSince: string | null; awaiting: boolean }>();
+    for (const c of allOpenLastGuest ?? []) {
+      map.set(c.conversation_id, {
+        waitingSince: c.last_guest_at,
+        awaiting: c.last_sender === "guest",
+      });
+    }
+    return map;
+  }, [allOpenLastGuest]);
+
+  const attentionQueue = useMemo(() => {
+    const list = (conversations ?? []).map((c) => {
+      const info = waitInfo.get(c.id);
+      const flagged = !!c.needs_staff;
+      const awaiting = !!info?.awaiting;
+      const since = info?.waitingSince ?? c.last_message_at;
+      const waitedMs = since ? Date.now() - new Date(since).getTime() : 0;
+      return { conv: c, flagged, awaiting, since, waitedMs, priority: flagged ? 2 : awaiting ? 1 : 0 };
+    });
+    return list
+      .filter((r) => (queueMode === "all" ? true : r.priority > 0))
+      .sort((a, b) => (b.priority - a.priority) || (b.waitedMs - a.waitedMs));
+  }, [conversations, waitInfo, queueMode]);
+
+  const attentionCount = useMemo(
+    () => (conversations ?? []).filter((c) => c.needs_staff || waitInfo.get(c.id)?.awaiting).length,
+    [conversations, waitInfo],
+  );
 
   async function sendTo(conversationId: string, body: string, source: "manual" | "ai_draft_approved" | "ai_draft_edited" | "template", originalDraft?: string | null) {
     const { data: u } = await supabase.auth.getUser();
@@ -176,7 +235,7 @@ function InboxPage() {
 
   async function approveForAll(body: string, originalDraft: string | null) {
     if (!activeId) return;
-    const targets = [activeId, ...similarOpen.map((s) => s.conversation_id)];
+    const targets = [activeId, ...approveTargets.map((s) => s.conversation_id)];
     let sent = 0;
     for (const cid of targets) {
       try {
@@ -187,6 +246,8 @@ function InboxPage() {
     toast.success(`Sent to ${sent} conversation${sent === 1 ? "" : "s"}`);
     setDraft("");
     setSuggestion(null);
+    setPreviewOpen(false);
+    setExcluded(new Set());
     qc.invalidateQueries();
   }
 
@@ -222,30 +283,51 @@ function InboxPage() {
         <div className="p-4 border-b border-border">
           <h2 className="font-serif text-xl">Inbox</h2>
           <p className="text-xs text-muted-foreground">{conversations?.length ?? 0} conversations</p>
+          <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setQueueMode("attention")}
+              className={`rounded-md px-2 py-1.5 transition ${queueMode === "attention" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+            >
+              Needs attention{attentionCount > 0 ? ` (${attentionCount})` : ""}
+            </button>
+            <button
+              type="button"
+              onClick={() => setQueueMode("all")}
+              className={`rounded-md px-2 py-1.5 transition ${queueMode === "all" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+            >
+              All
+            </button>
+          </div>
         </div>
-        {!conversations?.length ? (
-          <div className="p-6 text-sm text-muted-foreground text-center">No conversations yet.</div>
+        {!attentionQueue.length ? (
+          <div className="p-6 text-sm text-muted-foreground text-center">
+            {queueMode === "attention" ? "Nothing waiting on staff right now." : "No conversations yet."}
+          </div>
         ) : (
           <div className="divide-y divide-border">
-            {conversations.map((c) => (
+            {attentionQueue.map(({ conv: c, flagged, awaiting, since }) => (
               <button
                 key={c.id}
                 onClick={() => setActiveId(c.id)}
-                className={`w-full text-left p-4 hover:bg-accent transition ${activeId === c.id ? "bg-accent" : ""}`}
+                className={`w-full text-left p-4 hover:bg-accent transition ${activeId === c.id ? "bg-accent" : ""} ${flagged ? "border-l-2 border-l-amber-400" : ""}`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-medium truncate">{c.guest_name || "Guest"}</div>
                   <div className="flex items-center gap-1.5">
-                    {c.needs_staff && (
-                      <span className="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-900 border border-amber-200 rounded-full px-1.5 py-0.5">Needs staff</span>
+                    {flagged && (
+                      <span className="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-900 border border-amber-200 rounded-full px-1.5 py-0.5 inline-flex items-center gap-1">
+                        <AlertTriangle className="h-2.5 w-2.5" /> Needs staff
+                      </span>
                     )}
                     <span className={`h-2 w-2 rounded-full ${c.status === "open" ? "bg-emerald-500" : "bg-muted"}`} />
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground truncate mt-0.5">{c.guest_contact ?? "web chat"}</div>
-                {c.last_message_at && (
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    {formatDistanceToNow(new Date(c.last_message_at), { addSuffix: true })}
+                {since && (
+                  <div className={`text-[11px] mt-1 inline-flex items-center gap-1 ${awaiting || flagged ? "text-amber-700" : "text-muted-foreground"}`}>
+                    <Clock className="h-3 w-3" />
+                    {awaiting || flagged ? "waiting " : ""}{formatDistanceToNow(new Date(since), { addSuffix: !(awaiting || flagged) })}
                   </div>
                 )}
               </button>
@@ -253,6 +335,7 @@ function InboxPage() {
           </div>
         )}
       </aside>
+
 
       <section className="flex flex-col min-w-0">
         {!active ? (
@@ -295,21 +378,71 @@ function InboxPage() {
                     <Sparkles className="h-3 w-3" /> AI-suggested reply
                   </div>
                   <p className="text-sm text-blue-950 whitespace-pre-wrap">{suggestion}</p>
+
+                  <div className="mt-3 rounded-lg border border-blue-200 bg-white/60 p-2.5">
+                    <div className="flex items-center justify-between text-[11px] text-blue-900">
+                      <span>Similarity threshold</span>
+                      <span className="font-mono">{Math.round(threshold * 100)}%</span>
+                    </div>
+                    <Slider
+                      className="mt-2"
+                      min={20}
+                      max={100}
+                      step={5}
+                      value={[Math.round(threshold * 100)]}
+                      onValueChange={(v) => setThreshold((v[0] ?? 50) / 100)}
+                    />
+                    <div className="mt-1.5 flex items-center justify-between text-[11px] text-blue-900/80">
+                      <span>
+                        {similarOpen.length} matching conversation{similarOpen.length === 1 ? "" : "s"}
+                        {scoredOpen.length > 0 && ` of ${scoredOpen.length} open`}
+                      </span>
+                      {scoredOpen.length > 0 && (
+                        <button type="button" className="underline" onClick={() => setPreviewOpen((v) => !v)}>
+                          {previewOpen ? "Hide preview" : "Preview matches"}
+                        </button>
+                      )}
+                    </div>
+                    {previewOpen && (
+                      <div className="mt-2 max-h-44 overflow-y-auto space-y-1.5">
+                        {similarOpen.length === 0 ? (
+                          <p className="text-[11px] text-blue-900/70">No conversations match at this threshold.</p>
+                        ) : similarOpen.map((c) => {
+                          const checked = !excluded.has(c.conversation_id);
+                          return (
+                            <label key={c.conversation_id} className="flex items-start gap-2 rounded-md bg-white p-2 border border-blue-100 cursor-pointer">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(v) => setExcluded((prev) => {
+                                  const next = new Set(prev);
+                                  if (v) next.delete(c.conversation_id); else next.add(c.conversation_id);
+                                  return next;
+                                })}
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-medium truncate">{c.guest_name || "Guest"}</span>
+                                  <span className="text-[10px] font-mono text-blue-900/70">{Math.round(c.score * 100)}%</span>
+                                </span>
+                                <span className="block text-[11px] text-muted-foreground line-clamp-2">{c.body}</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Button size="sm" onClick={() => send(suggestion, "ai_draft_approved", suggestion)}>Approve &amp; send</Button>
-                    {similarOpen.length > 0 && (
+                    {approveTargets.length > 0 && (
                       <Button size="sm" variant="secondary" onClick={() => approveForAll(suggestion, suggestion)}>
-                        <Users className="h-3.5 w-3.5 mr-1" /> Approve for all similar ({similarOpen.length + 1})
+                        <Users className="h-3.5 w-3.5 mr-1" /> Approve for all similar ({approveTargets.length + 1})
                       </Button>
                     )}
                     <Button size="sm" variant="outline" onClick={() => { setDraft(suggestion); setSuggestion(null); }}>Edit</Button>
                     <Button size="sm" variant="ghost" onClick={() => setSuggestion(null)}>Dismiss</Button>
                   </div>
-                  {similarOpen.length > 0 && (
-                    <p className="text-[11px] text-blue-900/80 mt-2">
-                      {similarOpen.length} other open conversation{similarOpen.length === 1 ? "" : "s"} asked something similar.
-                    </p>
-                  )}
                 </Card>
               )}
               <div className="flex gap-2">
