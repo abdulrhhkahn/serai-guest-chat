@@ -153,6 +153,7 @@ export type Database = {
         Row: {
           approved: boolean
           body: string
+          client_msg_id: string | null
           conversation_id: string
           created_at: string
           id: string
@@ -165,6 +166,7 @@ export type Database = {
         Insert: {
           approved?: boolean
           body: string
+          client_msg_id?: string | null
           conversation_id: string
           created_at?: string
           id?: string
@@ -177,6 +179,7 @@ export type Database = {
         Update: {
           approved?: boolean
           body?: string
+          client_msg_id?: string | null
           conversation_id?: string
           created_at?: string
           id?: string
