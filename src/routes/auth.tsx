@@ -54,38 +54,6 @@ function AuthPage() {
     navigate({ to: "/dashboard" });
   }
 
-  async function enterAsDemo() {
-    setDemoLoading(true);
-    try {
-      let { error } = await supabase.auth.signInWithPassword({
-        email: DEMO_EMAIL,
-        password: DEMO_PASSWORD,
-      });
-      if (error) {
-        const { error: signUpErr } = await supabase.auth.signUp({
-          email: DEMO_EMAIL,
-          password: DEMO_PASSWORD,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-            data: { full_name: "Demo Staff" },
-          },
-        });
-        if (signUpErr) throw signUpErr;
-        const retry = await supabase.auth.signInWithPassword({
-          email: DEMO_EMAIL,
-          password: DEMO_PASSWORD,
-        });
-        error = retry.error;
-      }
-      if (error) throw error;
-      toast.success("Signed in as demo staff");
-      navigate({ to: "/dashboard" });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Demo login failed");
-    } finally {
-      setDemoLoading(false);
-    }
-  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
