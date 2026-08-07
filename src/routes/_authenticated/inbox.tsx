@@ -346,13 +346,35 @@ function InboxPage() {
           <>
             <div className="p-4 border-b border-border flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="font-medium truncate">{active.guest_name || "Guest"}</div>
-                <div className="text-xs text-muted-foreground truncate">{active.guest_contact ?? "web chat"}</div>
+                <div className="font-medium truncate flex items-center gap-2">
+                  {active.guest_name || "Guest"}
+                  {active.resolved_at && (
+                    <span className="text-[10px] uppercase tracking-wide bg-emerald-100 text-emerald-900 border border-emerald-200 rounded-full px-1.5 py-0.5 inline-flex items-center gap-1">
+                      <CheckCircle2 className="h-2.5 w-2.5" /> Resolved
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {active.guest_contact ?? "web chat"}
+                  {active.resolved_at && ` · marked handled ${formatDistanceToNow(new Date(active.resolved_at), { addSuffix: true })}`}
+                </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setAuditOpen(true)}>
-                <History className="h-3.5 w-3.5 mr-1.5" /> Audit
-              </Button>
+              <div className="flex items-center gap-2">
+                {active.resolved_at ? (
+                  <Button variant="outline" size="sm" onClick={() => setResolved(active.id, false)}>
+                    Reopen
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={() => setResolved(active.id, true)}>
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark resolved
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => setAuditOpen(true)}>
+                  <History className="h-3.5 w-3.5 mr-1.5" /> Audit
+                </Button>
+              </div>
             </div>
+
 
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-background">
               {messages?.map((m) => (
