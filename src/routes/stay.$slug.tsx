@@ -248,7 +248,10 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
       if ((error as { code?: string }).code !== "23505") throw error;
       return true;
     }
-    await supabase.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", convId);
+    // a new guest question reopens the thread, so a previously resolved chat stops showing "Resolved"
+    await supabase.from("conversations").update({ last_message_at: new Date().toISOString(), status: "open", resolved_at: null }).eq("id", convId);
+    setResolved(false);
+
     setAwaitingAi(true);
     fetch("/api/ai/concierge", {
       method: "POST",
