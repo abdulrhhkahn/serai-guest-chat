@@ -20,6 +20,7 @@ import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCheckinsRouteImport } from './routes/_authenticated/checkins'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
+import { Route as ApiPublicSeedDemoStaffRouteImport } from './routes/api/public/seed-demo-staff'
 import { Route as ApiAiSuggestReplyRouteImport } from './routes/api/ai/suggest-reply'
 import { Route as ApiAiConciergeRouteImport } from './routes/api/ai/concierge'
 
@@ -77,6 +78,11 @@ const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicSeedDemoStaffRoute = ApiPublicSeedDemoStaffRouteImport.update({
+  id: '/api/public/seed-demo-staff',
+  path: '/api/public/seed-demo-staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAiSuggestReplyRoute = ApiAiSuggestReplyRouteImport.update({
   id: '/api/ai/suggest-reply',
   path: '/api/ai/suggest-reply',
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/stay/$slug': typeof StaySlugRoute
   '/api/ai/concierge': typeof ApiAiConciergeRoute
   '/api/ai/suggest-reply': typeof ApiAiSuggestReplyRoute
+  '/api/public/seed-demo-staff': typeof ApiPublicSeedDemoStaffRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/stay/$slug': typeof StaySlugRoute
   '/api/ai/concierge': typeof ApiAiConciergeRoute
   '/api/ai/suggest-reply': typeof ApiAiSuggestReplyRoute
+  '/api/public/seed-demo-staff': typeof ApiPublicSeedDemoStaffRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/stay/$slug': typeof StaySlugRoute
   '/api/ai/concierge': typeof ApiAiConciergeRoute
   '/api/ai/suggest-reply': typeof ApiAiSuggestReplyRoute
+  '/api/public/seed-demo-staff': typeof ApiPublicSeedDemoStaffRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/stay/$slug'
     | '/api/ai/concierge'
     | '/api/ai/suggest-reply'
+    | '/api/public/seed-demo-staff'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/stay/$slug'
     | '/api/ai/concierge'
     | '/api/ai/suggest-reply'
+    | '/api/public/seed-demo-staff'
   id:
     | '__root__'
     | '/'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/stay/$slug'
     | '/api/ai/concierge'
     | '/api/ai/suggest-reply'
+    | '/api/public/seed-demo-staff'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -186,6 +198,7 @@ export interface RootRouteChildren {
   StaySlugRoute: typeof StaySlugRoute
   ApiAiConciergeRoute: typeof ApiAiConciergeRoute
   ApiAiSuggestReplyRoute: typeof ApiAiSuggestReplyRoute
+  ApiPublicSeedDemoStaffRoute: typeof ApiPublicSeedDemoStaffRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -267,6 +280,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/seed-demo-staff': {
+      id: '/api/public/seed-demo-staff'
+      path: '/api/public/seed-demo-staff'
+      fullPath: '/api/public/seed-demo-staff'
+      preLoaderRoute: typeof ApiPublicSeedDemoStaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ai/suggest-reply': {
       id: '/api/ai/suggest-reply'
       path: '/api/ai/suggest-reply'
@@ -313,6 +333,7 @@ const rootRouteChildren: RootRouteChildren = {
   StaySlugRoute: StaySlugRoute,
   ApiAiConciergeRoute: ApiAiConciergeRoute,
   ApiAiSuggestReplyRoute: ApiAiSuggestReplyRoute,
+  ApiPublicSeedDemoStaffRoute: ApiPublicSeedDemoStaffRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
