@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Send, Wifi, Clock, MapPin } from "lucide-react";
+import { Send, Wifi, Clock, MapPin, Bell, BellOff } from "lucide-react";
+import { notificationSupport, requestNotifyPermission, notifyGuest, type NotifyPermission } from "@/lib/guest-notifications";
+
 
 type StayProperty = { id: string; name: string; slug: string; logo_url: string | null; brand_color: string | null; address: string | null; wifi_ssid: string | null; wifi_password: string | null; checkin_time: string | null; checkout_time: string | null; welcome_message: string | null };
 
