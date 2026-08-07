@@ -288,15 +288,17 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   const lastMessage = messages.length ? messages[messages.length - 1] : null;
   const status: { tone: string; dot: string; label: string } = !online
     ? { tone: "text-amber-800 bg-amber-50", dot: "bg-amber-500", label: "Offline — messages will send when reconnected" }
-    : needsStaff
-      ? { tone: "text-amber-800 bg-amber-50", dot: "bg-amber-500", label: "A team member will respond shortly" }
-      : awaitingAi || (lastMessage?.sender === "guest")
-        ? { tone: "text-sky-800 bg-sky-50", dot: "bg-sky-500", label: "Concierge is looking that up…" }
-        : lastMessage?.sender === "ai"
-          ? { tone: "text-sky-800 bg-sky-50", dot: "bg-sky-500", label: "Answered by AI concierge" }
-          : lastMessage?.sender === "staff"
-            ? { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Answered by our team" }
-            : { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Online" };
+    : resolved
+      ? { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Resolved — our team marked this as handled" }
+      : needsStaff
+        ? { tone: "text-amber-800 bg-amber-50", dot: "bg-amber-500", label: "A team member will respond shortly" }
+        : awaitingAi || (lastMessage?.sender === "guest")
+          ? { tone: "text-sky-800 bg-sky-50", dot: "bg-sky-500", label: "Concierge is looking that up…" }
+          : lastMessage?.sender === "ai"
+            ? { tone: "text-sky-800 bg-sky-50", dot: "bg-sky-500", label: "Answered by AI concierge" }
+            : lastMessage?.sender === "staff"
+              ? { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Answered by our team" }
+              : { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Online" };
 
   if (!namePrompted) {
     return (
@@ -318,8 +320,28 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
       <div className={`px-3 py-1.5 text-[11px] flex items-center gap-1.5 border-b border-border ${status.tone}`}>
         <span className={`h-1.5 w-1.5 rounded-full ${status.dot} ${status.label.endsWith("…") ? "animate-pulse" : ""}`} />
         {status.label}
-        {pending.length > 0 && <span className="ml-auto">{pending.length} pending</span>}
+        {pending.length > 0 && <span className="ml-2">{pending.length} pending</span>}
+        {notifyState !== "unsupported" && (
+          <button
+            type="button"
+            className="ml-auto inline-flex items-center gap-1 underline underline-offset-2"
+            onClick={async () => {
+              if (notifyState === "granted") {
+                setNotifyState("default");
+                toast.info("Notifications paused for this device");
+                return;
+              }
+              const next = await requestNotifyPermission();
+              setNotifyState(next);
+              if (next === "granted") toast.success("We'll notify you when we reply");
+              else if (next === "denied") toast.error("Notifications blocked in your browser settings");
+            }}
+          >
+            {notifyState === "granted" ? <><Bell className="h-3 w-3" /> Alerts on</> : <><BellOff className="h-3 w-3" /> Notify me</>}
+          </button>
+        )}
       </div>
+
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2">
         {messages.length === 0 && pending.length === 0 && (
           <div className="text-center text-sm text-muted-foreground py-8">
