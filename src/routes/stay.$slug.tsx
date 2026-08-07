@@ -126,7 +126,10 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   const [namePrompted, setNamePrompted] = useState(!!name);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [needsStaff, setNeedsStaff] = useState(false);
+  const [resolved, setResolved] = useState(false);
+  const [notifyState, setNotifyState] = useState<NotifyPermission>("unsupported");
   const [awaitingAi, setAwaitingAi] = useState(false);
+
   const [pending, setPending] = useState<PendingMsg[]>(() => {
     if (typeof localStorage === "undefined") return [];
     try {
