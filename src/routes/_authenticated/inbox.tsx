@@ -25,7 +25,9 @@ type Conversation = {
   last_message_at: string | null;
   property_id: string;
   needs_staff: boolean | null;
+  resolved_at: string | null;
 };
+
 
 type Message = {
   id: string;
