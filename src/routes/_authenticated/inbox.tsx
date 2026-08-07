@@ -208,6 +208,22 @@ function InboxPage() {
     [conversations, waitInfo],
   );
 
+  // Mark a conversation handled (or reopen it). The guest's status pill listens for
+  // this update over realtime and switches to "Resolved".
+  async function setResolved(conversationId: string, done: boolean) {
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await supabase.from("conversations").update(
+      done
+        ? { status: "closed", needs_staff: false, resolved_at: new Date().toISOString(), resolved_by: u.user?.id ?? null }
+        : { status: "open", resolved_at: null, resolved_by: null },
+    ).eq("id", conversationId);
+    if (error) return toast.error(error.message);
+    toast.success(done ? "Marked resolved — guest notified" : "Conversation reopened");
+    qc.invalidateQueries({ queryKey: ["conversations"] });
+    qc.invalidateQueries({ queryKey: ["open-last-guest"] });
+  }
+
+
   async function sendTo(conversationId: string, body: string, source: "manual" | "ai_draft_approved" | "ai_draft_edited" | "template", originalDraft?: string | null) {
     const { data: u } = await supabase.auth.getUser();
     const { error } = await supabase.from("messages").insert({
