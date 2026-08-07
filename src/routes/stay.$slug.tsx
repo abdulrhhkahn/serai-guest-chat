@@ -167,13 +167,17 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
     return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
 
+  // reflect any previously granted notification permission
+  useEffect(() => { setNotifyState(notificationSupport()); }, []);
+
   useEffect(() => {
     if (!conversationId) return;
     const loadInitial = async () => {
       const { data } = await supabase.from("messages").select("*").eq("conversation_id", conversationId).order("created_at").order("id");
       setMessages((data ?? []) as Msg[]);
-      const { data: conv } = await supabase.from("conversations").select("needs_staff").eq("id", conversationId).maybeSingle();
+      const { data: conv } = await supabase.from("conversations").select("needs_staff, resolved_at, status").eq("id", conversationId).maybeSingle();
       setNeedsStaff(!!conv?.needs_staff);
+      setResolved(!!conv?.resolved_at || conv?.status === "closed");
     };
     loadInitial();
     const ch = supabase.channel(`guest-${conversationId}`)
@@ -181,13 +185,34 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
         (payload) => {
           const m = payload.new as Msg;
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-          if (m.sender !== "guest") setAwaitingAi(false);
+          if (m.sender !== "guest") {
+            setAwaitingAi(false);
+            void notifyGuest(
+              m.sender === "ai" ? "Answer from the concierge" : "A team member replied",
+              m.body.length > 120 ? `${m.body.slice(0, 117)}…` : m.body,
+              `serai-msg-${m.id}`,
+            );
+          }
         })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations", filter: `id=eq.${conversationId}` },
-        (payload) => setNeedsStaff(!!(payload.new as { needs_staff?: boolean }).needs_staff))
+        (payload) => {
+          const next = payload.new as { needs_staff?: boolean; resolved_at?: string | null; status?: string };
+          setNeedsStaff(!!next.needs_staff);
+          const nowResolved = !!next.resolved_at || next.status === "closed";
+          setResolved((prev) => {
+            if (nowResolved && !prev) {
+              void notifyGuest("Your request is handled", "Our team marked your conversation as resolved.", `serai-resolved-${conversationId}`);
+            }
+            return nowResolved;
+          });
+          if (next.needs_staff) {
+            void notifyGuest("We're getting a team member", "Your question needs a human — someone will reply shortly.", `serai-escalated-${conversationId}`);
+          }
+        })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [conversationId]);
+
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, pending]);
 
