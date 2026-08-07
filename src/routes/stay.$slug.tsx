@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Send, Wifi, Clock, MapPin } from "lucide-react";
+import { Send, Wifi, Clock, MapPin, Bell, BellOff } from "lucide-react";
+import { notificationSupport, requestNotifyPermission, notifyGuest, type NotifyPermission } from "@/lib/guest-notifications";
+
 
 type StayProperty = { id: string; name: string; slug: string; logo_url: string | null; brand_color: string | null; address: string | null; wifi_ssid: string | null; wifi_password: string | null; checkin_time: string | null; checkout_time: string | null; welcome_message: string | null };
 
@@ -124,7 +126,10 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   const [namePrompted, setNamePrompted] = useState(!!name);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [needsStaff, setNeedsStaff] = useState(false);
+  const [resolved, setResolved] = useState(false);
+  const [notifyState, setNotifyState] = useState<NotifyPermission>("unsupported");
   const [awaitingAi, setAwaitingAi] = useState(false);
+
   const [pending, setPending] = useState<PendingMsg[]>(() => {
     if (typeof localStorage === "undefined") return [];
     try {
@@ -162,13 +167,17 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
     return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
 
+  // reflect any previously granted notification permission
+  useEffect(() => { setNotifyState(notificationSupport()); }, []);
+
   useEffect(() => {
     if (!conversationId) return;
     const loadInitial = async () => {
       const { data } = await supabase.from("messages").select("*").eq("conversation_id", conversationId).order("created_at").order("id");
       setMessages((data ?? []) as Msg[]);
-      const { data: conv } = await supabase.from("conversations").select("needs_staff").eq("id", conversationId).maybeSingle();
+      const { data: conv } = await supabase.from("conversations").select("needs_staff, resolved_at, status").eq("id", conversationId).maybeSingle();
       setNeedsStaff(!!conv?.needs_staff);
+      setResolved(!!conv?.resolved_at || conv?.status === "closed");
     };
     loadInitial();
     const ch = supabase.channel(`guest-${conversationId}`)
@@ -176,13 +185,34 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
         (payload) => {
           const m = payload.new as Msg;
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-          if (m.sender !== "guest") setAwaitingAi(false);
+          if (m.sender !== "guest") {
+            setAwaitingAi(false);
+            void notifyGuest(
+              m.sender === "ai" ? "Answer from the concierge" : "A team member replied",
+              m.body.length > 120 ? `${m.body.slice(0, 117)}…` : m.body,
+              `serai-msg-${m.id}`,
+            );
+          }
         })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations", filter: `id=eq.${conversationId}` },
-        (payload) => setNeedsStaff(!!(payload.new as { needs_staff?: boolean }).needs_staff))
+        (payload) => {
+          const next = payload.new as { needs_staff?: boolean; resolved_at?: string | null; status?: string };
+          setNeedsStaff(!!next.needs_staff);
+          const nowResolved = !!next.resolved_at || next.status === "closed";
+          setResolved((prev) => {
+            if (nowResolved && !prev) {
+              void notifyGuest("Your request is handled", "Our team marked your conversation as resolved.", `serai-resolved-${conversationId}`);
+            }
+            return nowResolved;
+          });
+          if (next.needs_staff) {
+            void notifyGuest("We're getting a team member", "Your question needs a human — someone will reply shortly.", `serai-escalated-${conversationId}`);
+          }
+        })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [conversationId]);
+
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, pending]);
 
@@ -218,7 +248,10 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
       if ((error as { code?: string }).code !== "23505") throw error;
       return true;
     }
-    await supabase.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", convId);
+    // a new guest question reopens the thread, so a previously resolved chat stops showing "Resolved"
+    await supabase.from("conversations").update({ last_message_at: new Date().toISOString(), status: "open", resolved_at: null }).eq("id", convId);
+    setResolved(false);
+
     setAwaitingAi(true);
     fetch("/api/ai/concierge", {
       method: "POST",
@@ -286,15 +319,17 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   const lastMessage = messages.length ? messages[messages.length - 1] : null;
   const status: { tone: string; dot: string; label: string } = !online
     ? { tone: "text-amber-800 bg-amber-50", dot: "bg-amber-500", label: "Offline — messages will send when reconnected" }
-    : needsStaff
-      ? { tone: "text-amber-800 bg-amber-50", dot: "bg-amber-500", label: "A team member will respond shortly" }
-      : awaitingAi || (lastMessage?.sender === "guest")
-        ? { tone: "text-sky-800 bg-sky-50", dot: "bg-sky-500", label: "Concierge is looking that up…" }
-        : lastMessage?.sender === "ai"
-          ? { tone: "text-sky-800 bg-sky-50", dot: "bg-sky-500", label: "Answered by AI concierge" }
-          : lastMessage?.sender === "staff"
-            ? { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Answered by our team" }
-            : { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Online" };
+    : resolved
+      ? { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Resolved — our team marked this as handled" }
+      : needsStaff
+        ? { tone: "text-amber-800 bg-amber-50", dot: "bg-amber-500", label: "A team member will respond shortly" }
+        : awaitingAi || (lastMessage?.sender === "guest")
+          ? { tone: "text-sky-800 bg-sky-50", dot: "bg-sky-500", label: "Concierge is looking that up…" }
+          : lastMessage?.sender === "ai"
+            ? { tone: "text-sky-800 bg-sky-50", dot: "bg-sky-500", label: "Answered by AI concierge" }
+            : lastMessage?.sender === "staff"
+              ? { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Answered by our team" }
+              : { tone: "text-emerald-700 bg-emerald-50", dot: "bg-emerald-500", label: "Online" };
 
   if (!namePrompted) {
     return (
@@ -316,8 +351,28 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
       <div className={`px-3 py-1.5 text-[11px] flex items-center gap-1.5 border-b border-border ${status.tone}`}>
         <span className={`h-1.5 w-1.5 rounded-full ${status.dot} ${status.label.endsWith("…") ? "animate-pulse" : ""}`} />
         {status.label}
-        {pending.length > 0 && <span className="ml-auto">{pending.length} pending</span>}
+        {pending.length > 0 && <span className="ml-2">{pending.length} pending</span>}
+        {notifyState !== "unsupported" && (
+          <button
+            type="button"
+            className="ml-auto inline-flex items-center gap-1 underline underline-offset-2"
+            onClick={async () => {
+              if (notifyState === "granted") {
+                setNotifyState("default");
+                toast.info("Notifications paused for this device");
+                return;
+              }
+              const next = await requestNotifyPermission();
+              setNotifyState(next);
+              if (next === "granted") toast.success("We'll notify you when we reply");
+              else if (next === "denied") toast.error("Notifications blocked in your browser settings");
+            }}
+          >
+            {notifyState === "granted" ? <><Bell className="h-3 w-3" /> Alerts on</> : <><BellOff className="h-3 w-3" /> Notify me</>}
+          </button>
+        )}
       </div>
+
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2">
         {messages.length === 0 && pending.length === 0 && (
           <div className="text-center text-sm text-muted-foreground py-8">

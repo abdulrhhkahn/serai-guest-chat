@@ -80,6 +80,8 @@ export type Database = {
           last_message_at: string | null
           needs_staff: boolean
           property_id: string
+          resolved_at: string | null
+          resolved_by: string | null
           status: string
         }
         Insert: {
@@ -91,6 +93,8 @@ export type Database = {
           last_message_at?: string | null
           needs_staff?: boolean
           property_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           status?: string
         }
         Update: {
@@ -102,6 +106,8 @@ export type Database = {
           last_message_at?: string | null
           needs_staff?: boolean
           property_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           status?: string
         }
         Relationships: [
