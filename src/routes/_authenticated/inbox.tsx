@@ -683,7 +683,7 @@ function InboxPage() {
           </SheetHeader>
           <div className="mt-4 space-y-3">
             {(() => {
-              const items: { key: string; at: string; node: React.ReactNode }[] = [
+              const items: { key: string; at: string; node: ReactNode }[] = [
                 ...(messages ?? []).map((m) => ({ key: `m-${m.id}`, at: m.created_at, node: <AuditRow m={m} /> })),
                 ...(events ?? []).filter((e) => !e.event_type.startsWith("reply_")).map((e) => ({
                   key: `e-${e.id}`,
