@@ -171,8 +171,19 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
     return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
 
-  // reflect any previously granted notification permission
-  useEffect(() => { setNotifyState(notificationSupport()); }, []);
+  // reflect any previously granted notification permission + saved per-kind prefs
+  useEffect(() => {
+    setNotifyState(notificationSupport());
+    setNotifyPrefs(loadNotifyPrefs());
+  }, []);
+
+  function updatePref(kind: keyof NotifyPrefs, value: boolean) {
+    setNotifyPrefs((prev) => {
+      const next = { ...prev, [kind]: value };
+      saveNotifyPrefs(next);
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!conversationId) return;
