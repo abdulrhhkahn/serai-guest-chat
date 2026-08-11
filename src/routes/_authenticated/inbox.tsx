@@ -334,6 +334,7 @@ function InboxPage() {
         sent++;
       } catch { /* skip */ }
     }
+    await logEvent(activeId, "ai_batch_approved", `AI draft approved and sent to ${sent} conversation${sent === 1 ? "" : "s"}`);
     toast.success(`Sent to ${sent} conversation${sent === 1 ? "" : "s"}`);
     setDraft("");
     setSuggestion(null);
