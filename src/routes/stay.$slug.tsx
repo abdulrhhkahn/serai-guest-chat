@@ -206,6 +206,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
               m.sender === "ai" ? "Answer from the concierge" : "A team member replied",
               m.body.length > 120 ? `${m.body.slice(0, 117)}…` : m.body,
               `serai-msg-${m.id}`,
+              m.sender === "ai" ? "ai" : "staff",
             );
           }
         })
@@ -216,12 +217,12 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
           const nowResolved = !!next.resolved_at || next.status === "closed";
           setResolved((prev) => {
             if (nowResolved && !prev) {
-              void notifyGuest("Your request is handled", "Our team marked your conversation as resolved.", `serai-resolved-${conversationId}`);
+              void notifyGuest("Your request is handled", "Our team marked your conversation as resolved.", `serai-resolved-${conversationId}`, "resolved");
             }
             return nowResolved;
           });
           if (next.needs_staff) {
-            void notifyGuest("We're getting a team member", "Your question needs a human — someone will reply shortly.", `serai-escalated-${conversationId}`);
+            void notifyGuest("We're getting a team member", "Your question needs a human — someone will reply shortly.", `serai-escalated-${conversationId}`, "staff");
           }
         })
       .subscribe();
