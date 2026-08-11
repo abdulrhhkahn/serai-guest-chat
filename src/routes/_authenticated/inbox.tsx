@@ -318,6 +318,7 @@ function InboxPage() {
       setDraft("");
       setSuggestion(null);
       qc.invalidateQueries({ queryKey: ["messages", activeId] });
+      qc.invalidateQueries({ queryKey: ["conversation-events", activeId] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to send");
     }
