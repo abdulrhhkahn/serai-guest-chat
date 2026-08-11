@@ -678,15 +678,22 @@ function InboxPage() {
           <SheetHeader>
             <SheetTitle>Conversation audit</SheetTitle>
             <SheetDescription>
-              Every message in this conversation with source and timestamp.
+              Messages and state changes with source and timestamp.
             </SheetDescription>
           </SheetHeader>
           <div className="mt-4 space-y-3">
-            {!messages?.length ? (
-              <p className="text-sm text-muted-foreground">No activity yet.</p>
-            ) : messages.map((m) => (
-              <AuditRow key={m.id} m={m} />
-            ))}
+            {(() => {
+              const items: { key: string; at: string; node: React.ReactNode }[] = [
+                ...(messages ?? []).map((m) => ({ key: `m-${m.id}`, at: m.created_at, node: <AuditRow m={m} /> })),
+                ...(events ?? []).filter((e) => !e.event_type.startsWith("reply_")).map((e) => ({
+                  key: `e-${e.id}`,
+                  at: e.created_at,
+                  node: <EventRow e={e} />,
+                })),
+              ].sort((a, b) => a.at.localeCompare(b.at));
+              if (!items.length) return <p className="text-sm text-muted-foreground">No activity yet.</p>;
+              return items.map((i) => <div key={i.key}>{i.node}</div>);
+            })()}
           </div>
         </SheetContent>
       </Sheet>
