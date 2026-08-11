@@ -391,10 +391,49 @@ function InboxPage() {
               All
             </button>
           </div>
+
+          <div className="mt-3 space-y-2">
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search guest questions…"
+                className="h-8 pl-8 text-xs"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+            >
+              <option value="any">Any status</option>
+              <option value="needs_staff">Needs attention</option>
+              <option value="open">Unresolved</option>
+              <option value="resolved">Resolved</option>
+            </select>
+            <div className="flex items-center gap-1.5">
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" />
+              <span className="text-xs text-muted-foreground">→</span>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" />
+            </div>
+            {filtersActive && (
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{attentionQueue.length} match{attentionQueue.length === 1 ? "" : "es"}</span>
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => { setSearch(""); setStatusFilter("any"); setDateFrom(""); setDateTo(""); }}
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         {!attentionQueue.length ? (
           <div className="p-6 text-sm text-muted-foreground text-center">
-            {queueMode === "attention" ? "Nothing waiting on staff right now." : "No conversations yet."}
+            {filtersActive ? "No conversations match these filters." : queueMode === "attention" ? "Nothing waiting on staff right now." : "No conversations yet."}
           </div>
         ) : (
           <div className="divide-y divide-border">
