@@ -265,6 +265,22 @@ function AnalyticsPage() {
     setTo(format(new Date(), "yyyy-MM-dd"));
   }
 
+  /** Wait-time report by property for the selected range, in minutes. */
+  function exportCsv() {
+    const rows: (string | number)[][] = [
+      ["Property", "Date from", "Date to", "Threads", "Avg guest wait (min)", "Avg time to staff response (min)", "Flagged avg wait (min)"],
+      ...waitMetrics.perProperty.map((p) => [
+        p.name, from, to, p.threads, mins(p.avgAny), mins(p.avgStaff), mins(p.avgFlagged),
+      ]),
+      [
+        propertyId === "all" ? "All properties (overall)" : "Selected property (overall)",
+        from, to, waitMetrics.perProperty.reduce((a, p) => a + p.threads, 0),
+        mins(waitMetrics.avgAny), mins(waitMetrics.avgStaff), mins(waitMetrics.avgAttention),
+      ],
+    ];
+    downloadCsv(`serai-wait-times-${from}_${to}.csv`, rows);
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-6xl">
       <div className="flex flex-wrap items-end gap-3">
