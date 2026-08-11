@@ -236,6 +236,8 @@ function InboxPage() {
   }, [allOpenLastGuest]);
 
   const attentionQueue = useMemo(() => {
+    const fromMs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+    const toMs = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
     const list = (conversations ?? []).map((c) => {
       const info = waitInfo.get(c.id);
       const flagged = !!c.needs_staff;
@@ -246,13 +248,34 @@ function InboxPage() {
     });
     return list
       .filter((r) => (queueMode === "all" ? true : r.priority > 0))
+      .filter((r) => {
+        if (statusFilter === "needs_staff") return r.flagged;
+        if (statusFilter === "resolved") return !!r.conv.resolved_at;
+        if (statusFilter === "open") return !r.conv.resolved_at;
+        return true;
+      })
+      .filter((r) => {
+        if (!fromMs && !toMs) return true;
+        const t = r.conv.last_message_at ? new Date(r.conv.last_message_at).getTime() : null;
+        if (t === null) return false;
+        if (fromMs && t < fromMs) return false;
+        if (toMs && t > toMs) return false;
+        return true;
+      })
+      .filter((r) => {
+        if (searchTerm.length <= 1) return true;
+        if (searchHits?.has(r.conv.id)) return true;
+        return (r.conv.guest_name ?? "").toLowerCase().includes(searchTerm.toLowerCase());
+      })
       .sort((a, b) => (b.priority - a.priority) || (b.waitedMs - a.waitedMs));
-  }, [conversations, waitInfo, queueMode]);
+  }, [conversations, waitInfo, queueMode, statusFilter, dateFrom, dateTo, searchTerm, searchHits]);
 
   const attentionCount = useMemo(
     () => (conversations ?? []).filter((c) => c.needs_staff || waitInfo.get(c.id)?.awaiting).length,
     [conversations, waitInfo],
   );
+
+  const filtersActive = statusFilter !== "any" || !!dateFrom || !!dateTo || searchTerm.length > 1;
 
   // Mark a conversation handled (or reopen it). The guest's status pill listens for
   // this update over realtime and switches to "Resolved".
@@ -264,9 +287,11 @@ function InboxPage() {
         : { status: "open", resolved_at: null, resolved_by: null },
     ).eq("id", conversationId);
     if (error) return toast.error(error.message);
+    await logEvent(conversationId, done ? "resolved" : "reopened");
     toast.success(done ? "Marked resolved — guest notified" : "Conversation reopened");
     qc.invalidateQueries({ queryKey: ["conversations"] });
     qc.invalidateQueries({ queryKey: ["open-last-guest"] });
+    qc.invalidateQueries({ queryKey: ["conversation-events"] });
   }
 
 
@@ -283,6 +308,7 @@ function InboxPage() {
     });
     if (error) throw error;
     await supabase.from("conversations").update({ last_message_at: new Date().toISOString(), needs_staff: false }).eq("id", conversationId);
+    await logEvent(conversationId, `reply_${source}`, body.trim().slice(0, 200));
   }
 
   async function send(body: string, source: "manual" | "ai_draft_approved" | "ai_draft_edited" | "template" = "manual", originalDraft?: string | null) {
