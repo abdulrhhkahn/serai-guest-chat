@@ -43,6 +43,27 @@ function avg(list: number[]): number | null {
   return list.reduce((a, b) => a + b, 0) / list.length;
 }
 
+/** Minutes with one decimal, blank when there is no data. */
+function mins(ms: number | null): string {
+  if (ms === null || !isFinite(ms)) return "";
+  return (ms / 60000).toFixed(1);
+}
+
+function csvCell(v: string | number): string {
+  const s = String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function downloadCsv(filename: string, rows: (string | number)[][]) {
+  const csv = rows.map((r) => r.map(csvCell).join(",")).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function AnalyticsPage() {
   const [from, setFrom] = useState(format(subDays(new Date(), 14), "yyyy-MM-dd"));
   const [to, setTo] = useState(format(new Date(), "yyyy-MM-dd"));
