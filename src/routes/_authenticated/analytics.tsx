@@ -316,6 +316,9 @@ function AnalyticsPage() {
             <button onClick={() => preset(14)} className="text-xs px-2 py-1 rounded border border-border hover:bg-accent">14d</button>
             <button onClick={() => preset(30)} className="text-xs px-2 py-1 rounded border border-border hover:bg-accent">30d</button>
           </div>
+          <Button variant="outline" size="sm" className="h-9" onClick={exportCsv} disabled={!waitMetrics.perProperty.length}>
+            <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+          </Button>
         </div>
       </div>
 
