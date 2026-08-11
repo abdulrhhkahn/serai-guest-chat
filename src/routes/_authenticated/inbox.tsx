@@ -732,3 +732,22 @@ function AuditRow({ m }: { m: Message }) {
     </div>
   );
 }
+
+const EVENT_LABELS: Record<string, { label: string; tone: string }> = {
+  resolved: { label: "Marked resolved", tone: "bg-emerald-100 text-emerald-900" },
+  reopened: { label: "Reopened", tone: "bg-amber-100 text-amber-900" },
+  ai_batch_approved: { label: "AI draft approved for similar threads", tone: "bg-blue-100 text-blue-900" },
+};
+
+function EventRow({ e }: { e: ConvEvent }) {
+  const meta = EVENT_LABELS[e.event_type] ?? { label: e.event_type.replace(/_/g, " "), tone: "bg-muted text-foreground" };
+  return (
+    <div className="rounded-lg border border-dashed border-border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-[10px] uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.tone}`}>{meta.label}</span>
+        <span className="text-[11px] text-muted-foreground">{format(new Date(e.created_at), "MMM d, HH:mm:ss")}</span>
+      </div>
+      {e.detail && <p className="mt-1.5 text-xs text-muted-foreground whitespace-pre-wrap">{e.detail}</p>}
+    </div>
+  );
+}
