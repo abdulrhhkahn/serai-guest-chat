@@ -59,6 +59,18 @@ function similarity(a: string, b: string): number {
   return overlap / Math.min(ka.size, kb.size);
 }
 
+type ConvEvent = { id: string; conversation_id: string; event_type: string; detail: string | null; actor_user_id: string | null; created_at: string };
+
+async function logEvent(conversationId: string, event_type: string, detail?: string | null) {
+  const { data: u } = await supabase.auth.getUser();
+  await supabase.from("conversation_events").insert({
+    conversation_id: conversationId,
+    event_type,
+    detail: detail ?? null,
+    actor_user_id: u.user?.id ?? null,
+  });
+}
+
 function InboxPage() {
   const qc = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -70,6 +82,10 @@ function InboxPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [queueMode, setQueueMode] = useState<"attention" | "all">("attention");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"any" | "needs_staff" | "resolved" | "open">("any");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: conversations } = useQuery({
