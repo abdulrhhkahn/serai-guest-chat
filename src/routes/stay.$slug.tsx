@@ -448,3 +448,12 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   );
 }
 
+
+function PrefRow({ id, label, checked, onChange }: { id: string; label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <Label htmlFor={id} className="text-xs font-normal">{label}</Label>
+      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}
