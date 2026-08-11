@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { format, subDays, parseISO, eachDayOfInterval } from "date-fns";
 
@@ -41,6 +43,27 @@ function fmtDuration(ms: number | null): string {
 function avg(list: number[]): number | null {
   if (!list.length) return null;
   return list.reduce((a, b) => a + b, 0) / list.length;
+}
+
+/** Minutes with one decimal, blank when there is no data. */
+function mins(ms: number | null): string {
+  if (ms === null || !isFinite(ms)) return "";
+  return (ms / 60000).toFixed(1);
+}
+
+function csvCell(v: string | number): string {
+  const s = String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function downloadCsv(filename: string, rows: (string | number)[][]) {
+  const csv = rows.map((r) => r.map(csvCell).join(",")).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function AnalyticsPage() {
@@ -244,6 +267,22 @@ function AnalyticsPage() {
     setTo(format(new Date(), "yyyy-MM-dd"));
   }
 
+  /** Wait-time report by property for the selected range, in minutes. */
+  function exportCsv() {
+    const rows: (string | number)[][] = [
+      ["Property", "Date from", "Date to", "Threads", "Avg guest wait (min)", "Avg time to staff response (min)", "Flagged avg wait (min)"],
+      ...waitMetrics.perProperty.map((p) => [
+        p.name, from, to, p.threads, mins(p.avgAny), mins(p.avgStaff), mins(p.avgFlagged),
+      ]),
+      [
+        propertyId === "all" ? "All properties (overall)" : "Selected property (overall)",
+        from, to, waitMetrics.perProperty.reduce((a, p) => a + p.threads, 0),
+        mins(waitMetrics.avgAny), mins(waitMetrics.avgStaff), mins(waitMetrics.avgAttention),
+      ],
+    ];
+    downloadCsv(`serai-wait-times-${from}_${to}.csv`, rows);
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-6xl">
       <div className="flex flex-wrap items-end gap-3">
@@ -279,6 +318,9 @@ function AnalyticsPage() {
             <button onClick={() => preset(14)} className="text-xs px-2 py-1 rounded border border-border hover:bg-accent">14d</button>
             <button onClick={() => preset(30)} className="text-xs px-2 py-1 rounded border border-border hover:bg-accent">30d</button>
           </div>
+          <Button variant="outline" size="sm" className="h-9" onClick={exportCsv} disabled={!waitMetrics.perProperty.length}>
+            <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+          </Button>
         </div>
       </div>
 

@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Send, FileText, Users, History, AlertTriangle, Clock, CheckCircle2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Sparkles, Send, FileText, Users, History, AlertTriangle, Clock, CheckCircle2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -59,6 +60,18 @@ function similarity(a: string, b: string): number {
   return overlap / Math.min(ka.size, kb.size);
 }
 
+type ConvEvent = { id: string; conversation_id: string; event_type: string; detail: string | null; actor_user_id: string | null; created_at: string };
+
+async function logEvent(conversationId: string, event_type: string, detail?: string | null) {
+  const { data: u } = await supabase.auth.getUser();
+  await supabase.from("conversation_events").insert({
+    conversation_id: conversationId,
+    event_type,
+    detail: detail ?? null,
+    actor_user_id: u.user?.id ?? null,
+  });
+}
+
 function InboxPage() {
   const qc = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -70,6 +83,10 @@ function InboxPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [queueMode, setQueueMode] = useState<"attention" | "all">("attention");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"any" | "needs_staff" | "resolved" | "open">("any");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: conversations } = useQuery({
@@ -100,6 +117,36 @@ function InboxPage() {
       return (data ?? []) as Template[];
     },
   });
+
+  // Full-text-ish search across guest question keywords: matching conversation ids.
+  const searchTerm = search.trim();
+  const { data: searchHits } = useQuery({
+    queryKey: ["inbox-search", searchTerm],
+    enabled: searchTerm.length > 1,
+    queryFn: async () => {
+      const { data } = await supabase.from("messages")
+        .select("conversation_id, body, sender, created_at")
+        .ilike("body", `%${searchTerm}%`)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      const map = new Map<string, string>();
+      for (const m of data ?? []) if (!map.has(m.conversation_id)) map.set(m.conversation_id, m.body);
+      return map;
+    },
+  });
+
+  // Audit trail of state changes for the open conversation
+  const { data: events } = useQuery({
+    queryKey: ["conversation-events", activeId],
+    enabled: !!activeId,
+    queryFn: async () => {
+      const { data } = await supabase.from("conversation_events")
+        .select("*").eq("conversation_id", activeId!).order("created_at");
+      return (data ?? []) as ConvEvent[];
+    },
+  });
+
+
 
   const { data: allOpenLastGuest } = useQuery({
     queryKey: ["open-last-guest"],
@@ -190,6 +237,8 @@ function InboxPage() {
   }, [allOpenLastGuest]);
 
   const attentionQueue = useMemo(() => {
+    const fromMs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+    const toMs = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
     const list = (conversations ?? []).map((c) => {
       const info = waitInfo.get(c.id);
       const flagged = !!c.needs_staff;
@@ -200,13 +249,34 @@ function InboxPage() {
     });
     return list
       .filter((r) => (queueMode === "all" ? true : r.priority > 0))
+      .filter((r) => {
+        if (statusFilter === "needs_staff") return r.flagged;
+        if (statusFilter === "resolved") return !!r.conv.resolved_at;
+        if (statusFilter === "open") return !r.conv.resolved_at;
+        return true;
+      })
+      .filter((r) => {
+        if (!fromMs && !toMs) return true;
+        const t = r.conv.last_message_at ? new Date(r.conv.last_message_at).getTime() : null;
+        if (t === null) return false;
+        if (fromMs && t < fromMs) return false;
+        if (toMs && t > toMs) return false;
+        return true;
+      })
+      .filter((r) => {
+        if (searchTerm.length <= 1) return true;
+        if (searchHits?.has(r.conv.id)) return true;
+        return (r.conv.guest_name ?? "").toLowerCase().includes(searchTerm.toLowerCase());
+      })
       .sort((a, b) => (b.priority - a.priority) || (b.waitedMs - a.waitedMs));
-  }, [conversations, waitInfo, queueMode]);
+  }, [conversations, waitInfo, queueMode, statusFilter, dateFrom, dateTo, searchTerm, searchHits]);
 
   const attentionCount = useMemo(
     () => (conversations ?? []).filter((c) => c.needs_staff || waitInfo.get(c.id)?.awaiting).length,
     [conversations, waitInfo],
   );
+
+  const filtersActive = statusFilter !== "any" || !!dateFrom || !!dateTo || searchTerm.length > 1;
 
   // Mark a conversation handled (or reopen it). The guest's status pill listens for
   // this update over realtime and switches to "Resolved".
@@ -218,9 +288,11 @@ function InboxPage() {
         : { status: "open", resolved_at: null, resolved_by: null },
     ).eq("id", conversationId);
     if (error) return toast.error(error.message);
+    await logEvent(conversationId, done ? "resolved" : "reopened");
     toast.success(done ? "Marked resolved — guest notified" : "Conversation reopened");
     qc.invalidateQueries({ queryKey: ["conversations"] });
     qc.invalidateQueries({ queryKey: ["open-last-guest"] });
+    qc.invalidateQueries({ queryKey: ["conversation-events"] });
   }
 
 
@@ -237,6 +309,7 @@ function InboxPage() {
     });
     if (error) throw error;
     await supabase.from("conversations").update({ last_message_at: new Date().toISOString(), needs_staff: false }).eq("id", conversationId);
+    await logEvent(conversationId, `reply_${source}`, body.trim().slice(0, 200));
   }
 
   async function send(body: string, source: "manual" | "ai_draft_approved" | "ai_draft_edited" | "template" = "manual", originalDraft?: string | null) {
@@ -246,6 +319,7 @@ function InboxPage() {
       setDraft("");
       setSuggestion(null);
       qc.invalidateQueries({ queryKey: ["messages", activeId] });
+      qc.invalidateQueries({ queryKey: ["conversation-events", activeId] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to send");
     }
@@ -261,6 +335,7 @@ function InboxPage() {
         sent++;
       } catch { /* skip */ }
     }
+    await logEvent(activeId, "ai_batch_approved", `AI draft approved and sent to ${sent} conversation${sent === 1 ? "" : "s"}`);
     toast.success(`Sent to ${sent} conversation${sent === 1 ? "" : "s"}`);
     setDraft("");
     setSuggestion(null);
@@ -317,10 +392,49 @@ function InboxPage() {
               All
             </button>
           </div>
+
+          <div className="mt-3 space-y-2">
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search guest questions…"
+                className="h-8 pl-8 text-xs"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+            >
+              <option value="any">Any status</option>
+              <option value="needs_staff">Needs attention</option>
+              <option value="open">Unresolved</option>
+              <option value="resolved">Resolved</option>
+            </select>
+            <div className="flex items-center gap-1.5">
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" />
+              <span className="text-xs text-muted-foreground">→</span>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" />
+            </div>
+            {filtersActive && (
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{attentionQueue.length} match{attentionQueue.length === 1 ? "" : "es"}</span>
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => { setSearch(""); setStatusFilter("any"); setDateFrom(""); setDateTo(""); }}
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         {!attentionQueue.length ? (
           <div className="p-6 text-sm text-muted-foreground text-center">
-            {queueMode === "attention" ? "Nothing waiting on staff right now." : "No conversations yet."}
+            {filtersActive ? "No conversations match these filters." : queueMode === "attention" ? "Nothing waiting on staff right now." : "No conversations yet."}
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -564,15 +678,22 @@ function InboxPage() {
           <SheetHeader>
             <SheetTitle>Conversation audit</SheetTitle>
             <SheetDescription>
-              Every message in this conversation with source and timestamp.
+              Messages and state changes with source and timestamp.
             </SheetDescription>
           </SheetHeader>
           <div className="mt-4 space-y-3">
-            {!messages?.length ? (
-              <p className="text-sm text-muted-foreground">No activity yet.</p>
-            ) : messages.map((m) => (
-              <AuditRow key={m.id} m={m} />
-            ))}
+            {(() => {
+              const items: { key: string; at: string; node: ReactNode }[] = [
+                ...(messages ?? []).map((m) => ({ key: `m-${m.id}`, at: m.created_at, node: <AuditRow m={m} /> })),
+                ...(events ?? []).filter((e) => !e.event_type.startsWith("reply_")).map((e) => ({
+                  key: `e-${e.id}`,
+                  at: e.created_at,
+                  node: <EventRow e={e} />,
+                })),
+              ].sort((a, b) => a.at.localeCompare(b.at));
+              if (!items.length) return <p className="text-sm text-muted-foreground">No activity yet.</p>;
+              return items.map((i) => <div key={i.key}>{i.node}</div>);
+            })()}
           </div>
         </SheetContent>
       </Sheet>
@@ -608,6 +729,25 @@ function AuditRow({ m }: { m: Message }) {
           <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap border-l-2 border-border pl-2">{m.original_draft}</p>
         </details>
       )}
+    </div>
+  );
+}
+
+const EVENT_LABELS: Record<string, { label: string; tone: string }> = {
+  resolved: { label: "Marked resolved", tone: "bg-emerald-100 text-emerald-900" },
+  reopened: { label: "Reopened", tone: "bg-amber-100 text-amber-900" },
+  ai_batch_approved: { label: "AI draft approved for similar threads", tone: "bg-blue-100 text-blue-900" },
+};
+
+function EventRow({ e }: { e: ConvEvent }) {
+  const meta = EVENT_LABELS[e.event_type] ?? { label: e.event_type.replace(/_/g, " "), tone: "bg-muted text-foreground" };
+  return (
+    <div className="rounded-lg border border-dashed border-border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-[10px] uppercase tracking-wide rounded-full px-2 py-0.5 ${meta.tone}`}>{meta.label}</span>
+        <span className="text-[11px] text-muted-foreground">{format(new Date(e.created_at), "MMM d, HH:mm:ss")}</span>
+      </div>
+      {e.detail && <p className="mt-1.5 text-xs text-muted-foreground whitespace-pre-wrap">{e.detail}</p>}
     </div>
   );
 }

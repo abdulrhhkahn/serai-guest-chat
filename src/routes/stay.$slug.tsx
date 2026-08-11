@@ -6,7 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Send, Wifi, Clock, MapPin, Bell, BellOff } from "lucide-react";
-import { notificationSupport, requestNotifyPermission, notifyGuest, type NotifyPermission } from "@/lib/guest-notifications";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { notificationSupport, requestNotifyPermission, notifyGuest, loadNotifyPrefs, saveNotifyPrefs, type NotifyPrefs, type NotifyPermission } from "@/lib/guest-notifications";
 
 
 type StayProperty = { id: string; name: string; slug: string; logo_url: string | null; brand_color: string | null; address: string | null; wifi_ssid: string | null; wifi_password: string | null; checkin_time: string | null; checkout_time: string | null; welcome_message: string | null };
@@ -128,6 +131,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   const [needsStaff, setNeedsStaff] = useState(false);
   const [resolved, setResolved] = useState(false);
   const [notifyState, setNotifyState] = useState<NotifyPermission>("unsupported");
+  const [notifyPrefs, setNotifyPrefs] = useState<NotifyPrefs>({ ai: true, staff: true, resolved: true });
   const [awaitingAi, setAwaitingAi] = useState(false);
 
   const [pending, setPending] = useState<PendingMsg[]>(() => {
@@ -167,8 +171,19 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
     return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
 
-  // reflect any previously granted notification permission
-  useEffect(() => { setNotifyState(notificationSupport()); }, []);
+  // reflect any previously granted notification permission + saved per-kind prefs
+  useEffect(() => {
+    setNotifyState(notificationSupport());
+    setNotifyPrefs(loadNotifyPrefs());
+  }, []);
+
+  function updatePref(kind: keyof NotifyPrefs, value: boolean) {
+    setNotifyPrefs((prev) => {
+      const next = { ...prev, [kind]: value };
+      saveNotifyPrefs(next);
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!conversationId) return;
@@ -191,6 +206,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
               m.sender === "ai" ? "Answer from the concierge" : "A team member replied",
               m.body.length > 120 ? `${m.body.slice(0, 117)}…` : m.body,
               `serai-msg-${m.id}`,
+              m.sender === "ai" ? "ai" : "staff",
             );
           }
         })
@@ -201,12 +217,12 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
           const nowResolved = !!next.resolved_at || next.status === "closed";
           setResolved((prev) => {
             if (nowResolved && !prev) {
-              void notifyGuest("Your request is handled", "Our team marked your conversation as resolved.", `serai-resolved-${conversationId}`);
+              void notifyGuest("Your request is handled", "Our team marked your conversation as resolved.", `serai-resolved-${conversationId}`, "resolved");
             }
             return nowResolved;
           });
           if (next.needs_staff) {
-            void notifyGuest("We're getting a team member", "Your question needs a human — someone will reply shortly.", `serai-escalated-${conversationId}`);
+            void notifyGuest("We're getting a team member", "Your question needs a human — someone will reply shortly.", `serai-escalated-${conversationId}`, "staff");
           }
         })
       .subscribe();
@@ -353,23 +369,41 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
         {status.label}
         {pending.length > 0 && <span className="ml-2">{pending.length} pending</span>}
         {notifyState !== "unsupported" && (
-          <button
-            type="button"
-            className="ml-auto inline-flex items-center gap-1 underline underline-offset-2"
-            onClick={async () => {
-              if (notifyState === "granted") {
-                setNotifyState("default");
-                toast.info("Notifications paused for this device");
-                return;
-              }
-              const next = await requestNotifyPermission();
-              setNotifyState(next);
-              if (next === "granted") toast.success("We'll notify you when we reply");
-              else if (next === "denied") toast.error("Notifications blocked in your browser settings");
-            }}
-          >
-            {notifyState === "granted" ? <><Bell className="h-3 w-3" /> Alerts on</> : <><BellOff className="h-3 w-3" /> Notify me</>}
-          </button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button type="button" className="ml-auto inline-flex items-center gap-1 underline underline-offset-2">
+                {notifyState === "granted" && (notifyPrefs.ai || notifyPrefs.staff || notifyPrefs.resolved)
+                  ? <><Bell className="h-3 w-3" /> Alerts on</>
+                  : <><BellOff className="h-3 w-3" /> Notify me</>}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72">
+              <div className="text-sm font-medium">Notifications</div>
+              <p className="text-xs text-muted-foreground mt-0.5">Choose what you'd like alerts for on this device.</p>
+
+              {notifyState !== "granted" && (
+                <Button
+                  size="sm"
+                  className="mt-3 w-full"
+                  style={{ background: brand, color: "white" }}
+                  onClick={async () => {
+                    const next = await requestNotifyPermission();
+                    setNotifyState(next);
+                    if (next === "granted") toast.success("We'll notify you when we reply");
+                    else if (next === "denied") toast.error("Notifications blocked in your browser settings");
+                  }}
+                >
+                  {notifyState === "denied" ? "Blocked in browser settings" : "Enable push alerts"}
+                </Button>
+              )}
+
+              <div className={`mt-3 space-y-3 ${notifyState === "granted" ? "" : "opacity-50 pointer-events-none"}`}>
+                <PrefRow id="pref-ai" label="AI concierge answers" checked={notifyPrefs.ai} onChange={(v) => updatePref("ai", v)} />
+                <PrefRow id="pref-staff" label="Replies from our team" checked={notifyPrefs.staff} onChange={(v) => updatePref("staff", v)} />
+                <PrefRow id="pref-resolved" label="When a request is resolved" checked={notifyPrefs.resolved} onChange={(v) => updatePref("resolved", v)} />
+              </div>
+            </PopoverContent>
+          </Popover>
         )}
       </div>
 
@@ -414,3 +448,12 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   );
 }
 
+
+function PrefRow({ id, label, checked, onChange }: { id: string; label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <Label htmlFor={id} className="text-xs font-normal">{label}</Label>
+      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}

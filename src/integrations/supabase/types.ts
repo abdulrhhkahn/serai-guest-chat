@@ -70,6 +70,41 @@ export type Database = {
           },
         ]
       }
+      conversation_events: {
+        Row: {
+          actor_user_id: string | null
+          conversation_id: string
+          created_at: string
+          detail: string | null
+          event_type: string
+          id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          conversation_id: string
+          created_at?: string
+          detail?: string | null
+          event_type: string
+          id?: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          detail?: string | null
+          event_type?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_events_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           channel: string
