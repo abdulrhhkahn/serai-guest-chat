@@ -117,6 +117,36 @@ function InboxPage() {
     },
   });
 
+  // Full-text-ish search across guest question keywords: matching conversation ids.
+  const searchTerm = search.trim();
+  const { data: searchHits } = useQuery({
+    queryKey: ["inbox-search", searchTerm],
+    enabled: searchTerm.length > 1,
+    queryFn: async () => {
+      const { data } = await supabase.from("messages")
+        .select("conversation_id, body, sender, created_at")
+        .ilike("body", `%${searchTerm}%`)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      const map = new Map<string, string>();
+      for (const m of data ?? []) if (!map.has(m.conversation_id)) map.set(m.conversation_id, m.body);
+      return map;
+    },
+  });
+
+  // Audit trail of state changes for the open conversation
+  const { data: events } = useQuery({
+    queryKey: ["conversation-events", activeId],
+    enabled: !!activeId,
+    queryFn: async () => {
+      const { data } = await supabase.from("conversation_events")
+        .select("*").eq("conversation_id", activeId!).order("created_at");
+      return (data ?? []) as ConvEvent[];
+    },
+  });
+
+
+
   const { data: allOpenLastGuest } = useQuery({
     queryKey: ["open-last-guest"],
     queryFn: async () => {
