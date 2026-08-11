@@ -131,6 +131,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   const [needsStaff, setNeedsStaff] = useState(false);
   const [resolved, setResolved] = useState(false);
   const [notifyState, setNotifyState] = useState<NotifyPermission>("unsupported");
+  const [notifyPrefs, setNotifyPrefs] = useState<NotifyPrefs>({ ai: true, staff: true, resolved: true });
   const [awaitingAi, setAwaitingAi] = useState(false);
 
   const [pending, setPending] = useState<PendingMsg[]>(() => {
