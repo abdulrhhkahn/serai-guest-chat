@@ -1,7 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { generateText } from "ai";
-import { verifyTurnstile, turnstileEnabled } from "@/lib/turnstile.server";
+
+// Best-effort per-user throttle. NOTE: in-memory only — it protects a single
+// running instance, not a horizontally-scaled/serverless deployment. For real
+// protection add Cloudflare Turnstile on conversation creation and/or a shared
+// store (Upstash/Redis or a Postgres rate-limit table). See APPLY.md.
+const HITS = new Map<string, number[]>();
+const WINDOW_MS = 60_000;
+const MAX_PER_WINDOW = 12;
+function rateLimited(userId: string): boolean {
+  const now = Date.now();
+  const recent = (HITS.get(userId) ?? []).filter((t) => now - t < WINDOW_MS);
+  recent.push(now);
+  HITS.set(userId, recent);
+  return recent.length > MAX_PER_WINDOW;
+}
 
 export const Route = createFileRoute("/api/ai/concierge")({
   server: {
@@ -13,10 +27,9 @@ export const Route = createFileRoute("/api/ai/concierge")({
           return new Response("Unauthorized", { status: 401 });
         }
 
-        const { conversationId, question, turnstileToken } = (await request.json()) as {
+        const { conversationId, question } = (await request.json()) as {
           conversationId?: string;
           question?: string;
-          turnstileToken?: string;
         };
         if (!conversationId || typeof question !== "string" || !question.trim()) {
           return new Response("Bad request", { status: 400 });
@@ -25,7 +38,9 @@ export const Route = createFileRoute("/api/ai/concierge")({
           return new Response("Question too long", { status: 413 });
         }
 
-        // 2. Resolve + authorize the caller.
+        // 2. Resolve the caller from their JWT, and confirm they own this
+        //    conversation. RLS on this token-scoped client only returns the row
+        //    if guest_user_id = auth.uid(), so ownership is enforced twice.
         const asUser = createClient(
           process.env.SUPABASE_URL!,
           process.env.SUPABASE_PUBLISHABLE_KEY!,
@@ -40,54 +55,30 @@ export const Route = createFileRoute("/api/ai/concierge")({
           return new Response("Unauthorized", { status: 401 });
         }
 
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
-
-        // 3. Durable rate limit (shared across all instances via Postgres).
-        const { data: allowed } = await supabaseAdmin.rpc("check_rate_limit", {
-          _bucket: "concierge",
-          _identity: userData.user.id,
-          _max: 20,
-          _window_secs: 60,
-        });
-        if (allowed === false) {
+        if (rateLimited(userData.user.id)) {
           return new Response("Too many requests", { status: 429 });
         }
 
-        // 4. Ownership: RLS on this token-scoped client only returns the row if
-        //    guest_user_id = auth.uid(), so this doubly enforces ownership.
         const { data: conv } = await asUser
           .from("conversations")
           .select("id, property_id, guest_user_id")
           .eq("id", conversationId)
           .maybeSingle();
+
         if (!conv || conv.guest_user_id !== userData.user.id) {
           return new Response("Forbidden", { status: 403 });
         }
+
+        // propertyId is derived from the verified conversation — never trusted
+        // from the request body (that was the injection vector).
         const propertyId = conv.property_id;
 
-        // 5. Turnstile (opt-in): only challenge the FIRST guest message of a
-        //    conversation, so a verified guest isn't re-challenged per message.
-        if (turnstileEnabled()) {
-          const { count } = await supabaseAdmin
-            .from("messages")
-            .select("id", { count: "exact", head: true })
-            .eq("conversation_id", conversationId)
-            .eq("sender", "guest");
-          const isFirst = (count ?? 0) <= 1;
-          if (isFirst) {
-            const ip =
-              request.headers.get("cf-connecting-ip") ??
-              request.headers.get("x-forwarded-for");
-            const ok = await verifyTurnstile(turnstileToken, ip);
-            if (!ok) {
-              return new Response("Verification required", { status: 403 });
-            }
-          }
-        }
+        // 3. Server-side work uses the service-role client (bypasses RLS) but is
+        //    now gated behind the ownership check above.
+        const { supabaseAdmin } = await import(
+          "@/integrations/supabase/client.server"
+        );
 
-        // 6. Generate + persist the reply (service role, gated by all the above).
         const { data: faqs } = await supabaseAdmin
           .from("faqs")
           .select("question,answer,category")
