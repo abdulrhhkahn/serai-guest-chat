@@ -15,7 +15,9 @@ export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
     const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth" });
+    // Guests hold an anonymous session (is_anonymous=true); they must never
+    // reach the staff area even though they are technically "authenticated".
+    if (error || !data.user || data.user.is_anonymous) throw redirect({ to: "/auth" });
     return { user: data.user };
   },
   component: AuthedLayout,
