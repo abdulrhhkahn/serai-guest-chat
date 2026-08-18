@@ -1,35 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { generateText } from "ai";
+import { verifyTurnstile, turnstileEnabled } from "@/lib/turnstile.server";
 
-// Best-effort per-user throttle. NOTE: in-memory only — it protects a single
-// running instance, not a horizontally-scaled/serverless deployment. For real
-// protection add Cloudflare Turnstile on conversation creation and/or a shared
-// store (Upstash/Redis or a Postgres rate-limit table). See APPLY.md.
-const HITS = new Map<string, number[]>();
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 12;
-function rateLimited(userId: string): boolean {
-  const now = Date.now();
-  const recent = (HITS.get(userId) ?? []).filter((t) => now - t < WINDOW_MS);
-  recent.push(now);
-  HITS.set(userId, recent);
-  return recent.length > MAX_PER_WINDOW;
-}
+type Level = "suggest" | "approve" | "auto";
 
 export const Route = createFileRoute("/api/ai/concierge")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // 1. Require the guest's (anonymous) session token.
         const authHeader = request.headers.get("authorization");
         if (!authHeader?.startsWith("Bearer ")) {
           return new Response("Unauthorized", { status: 401 });
         }
 
-        const { conversationId, question } = (await request.json()) as {
+        const { conversationId, question, turnstileToken } = (await request.json()) as {
           conversationId?: string;
           question?: string;
+          turnstileToken?: string;
         };
         if (!conversationId || typeof question !== "string" || !question.trim()) {
           return new Response("Bad request", { status: 400 });
@@ -38,9 +26,6 @@ export const Route = createFileRoute("/api/ai/concierge")({
           return new Response("Question too long", { status: 413 });
         }
 
-        // 2. Resolve the caller from their JWT, and confirm they own this
-        //    conversation. RLS on this token-scoped client only returns the row
-        //    if guest_user_id = auth.uid(), so ownership is enforced twice.
         const asUser = createClient(
           process.env.SUPABASE_URL!,
           process.env.SUPABASE_PUBLISHABLE_KEY!,
@@ -55,66 +40,91 @@ export const Route = createFileRoute("/api/ai/concierge")({
           return new Response("Unauthorized", { status: 401 });
         }
 
-        if (rateLimited(userData.user.id)) {
-          return new Response("Too many requests", { status: 429 });
-        }
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+        // Durable, shared rate limit.
+        const { data: allowed } = await supabaseAdmin.rpc("check_rate_limit", {
+          _bucket: "concierge",
+          _identity: userData.user.id,
+          _max: 20,
+          _window_secs: 60,
+        });
+        if (allowed === false) return new Response("Too many requests", { status: 429 });
+
+        // Ownership.
         const { data: conv } = await asUser
           .from("conversations")
           .select("id, property_id, guest_user_id")
           .eq("id", conversationId)
           .maybeSingle();
-
         if (!conv || conv.guest_user_id !== userData.user.id) {
           return new Response("Forbidden", { status: 403 });
         }
-
-        // propertyId is derived from the verified conversation — never trusted
-        // from the request body (that was the injection vector).
         const propertyId = conv.property_id;
 
-        // 3. Server-side work uses the service-role client (bypasses RLS) but is
-        //    now gated behind the ownership check above.
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
+        // Turnstile (opt-in) on the first guest message only.
+        if (turnstileEnabled()) {
+          const { count } = await supabaseAdmin
+            .from("messages")
+            .select("id", { count: "exact", head: true })
+            .eq("conversation_id", conversationId)
+            .eq("sender", "guest");
+          if ((count ?? 0) <= 1) {
+            const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for");
+            if (!(await verifyTurnstile(turnstileToken, ip))) {
+              return new Response("Verification required", { status: 403 });
+            }
+          }
+        }
+
+        // Context: FAQs, property (incl. default autonomy), and per-category rules.
+        const [{ data: faqs }, { data: prop }, { data: rules }] = await Promise.all([
+          supabaseAdmin.from("faqs").select("question,answer,category").eq("property_id", propertyId),
+          supabaseAdmin
+            .from("properties")
+            .select("name,wifi_ssid,wifi_password,checkin_time,checkout_time,address,welcome_message,default_autonomy")
+            .eq("id", propertyId)
+            .maybeSingle(),
+          supabaseAdmin.from("category_autonomy").select("category,level").eq("property_id", propertyId),
+        ]);
+
+        const defaultLevel: Level = (prop?.default_autonomy as Level) ?? "auto";
+        const ruleMap = new Map<string, Level>((rules ?? []).map((r) => [r.category.toLowerCase(), r.level as Level]));
+        const categories = Array.from(
+          new Set((faqs ?? []).map((f) => f.category).filter((c): c is string => !!c)),
         );
-
-        const { data: faqs } = await supabaseAdmin
-          .from("faqs")
-          .select("question,answer,category")
-          .eq("property_id", propertyId);
-
-        const { data: prop } = await supabaseAdmin
-          .from("properties")
-          .select("name,wifi_ssid,wifi_password,checkin_time,checkout_time,address,welcome_message")
-          .eq("id", propertyId)
-          .maybeSingle();
 
         const apiKey = process.env.LOVABLE_API_KEY;
 
-        async function flagForStaff(body: string) {
+        async function sendToGuest(body: string, uncertain: boolean) {
           await supabaseAdmin.from("messages").insert({
-            conversation_id: conversationId,
-            sender: "ai",
-            body,
-            approved: true,
-            source: "ai_direct",
+            conversation_id: conversationId, sender: "ai", body, approved: true, source: "ai_direct",
           });
-          await supabaseAdmin
-            .from("conversations")
+          await supabaseAdmin.from("conversations")
+            .update({ last_message_at: new Date().toISOString(), status: "open", ...(uncertain ? { needs_staff: true } : {}) })
+            .eq("id", conversationId);
+        }
+
+        // Escalate: store the draft for staff and flag the conversation. The
+        // guest is NOT answered directly; they see the "getting a team member"
+        // state via the needs_staff flag they already subscribe to.
+        async function escalate(draft: string, category: string | null) {
+          await supabaseAdmin.from("ai_drafts").insert({
+            conversation_id: conversationId, property_id: propertyId, category, draft,
+          });
+          await supabaseAdmin.from("conversations")
             .update({ last_message_at: new Date().toISOString(), status: "open", needs_staff: true })
             .eq("id", conversationId);
         }
 
         if (!apiKey) {
-          await flagForStaff("Thanks for your message! A team member will reply shortly.");
-          return Response.json({ ok: true, uncertain: true, fallback: true });
+          await escalate("(No AI configured — a team member will reply.)", null);
+          return Response.json({ ok: true, escalated: true, fallback: true });
         }
 
         try {
           const { createLovableAiGatewayProvider } = await import("@/lib/ai-gateway.server");
-          const gateway = createLovableAiGatewayProvider(apiKey);
-          const model = gateway("google/gemini-2.5-flash");
+          const model = createLovableAiGatewayProvider(apiKey)("google/gemini-2.5-flash");
 
           const context = [
             prop ? `Property: ${prop.name}` : "",
@@ -123,39 +133,47 @@ export const Route = createFileRoute("/api/ai/concierge")({
             prop?.wifi_ssid ? `Wifi SSID: ${prop.wifi_ssid}` : "",
             prop?.wifi_password ? `Wifi password: ${prop.wifi_password}` : "",
             prop?.address ? `Address: ${prop.address}` : "",
-            "",
-            "FAQs:",
-            ...(faqs ?? []).map((f) => `Q: ${f.question}\nA: ${f.answer}`),
+            "", "FAQs:",
+            ...(faqs ?? []).map((f) => `[${f.category ?? "General"}] Q: ${f.question}\nA: ${f.answer}`),
           ].filter(Boolean).join("\n");
 
+          const catList = categories.length ? categories.join(", ") : "(none)";
           const { text } = await generateText({
             model,
-            system: `You are a warm, concise concierge for ${prop?.name ?? "this hotel"}. Answer guest questions using ONLY the property info and FAQs below. If you don't have enough info, reply EXACTLY: "Let me get a team member to help." Keep replies under 3 sentences, friendly, no emojis.\n\n${context}`,
+            system:
+              `You are a warm, concise concierge for ${prop?.name ?? "this hotel"}. Answer using ONLY the property info and FAQs below. ` +
+              `If you don't have enough info, set "answer" to exactly "Let me get a team member to help." ` +
+              `Also classify the question into ONE category from this list: [${catList}] — or "other" if none fit. ` +
+              `Reply with ONLY minified JSON, no code fences: {"answer":"...","category":"..."}. Keep the answer under 3 sentences, friendly, no emojis.\n\n${context}`,
             prompt: question,
           });
 
-          const uncertain = /team member to help/i.test(text);
+          // Parse the model's JSON defensively.
+          let answer = text.trim();
+          let category = "other";
+          try {
+            const cleaned = answer.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+            const parsed = JSON.parse(cleaned) as { answer?: string; category?: string };
+            if (parsed.answer) answer = parsed.answer.trim();
+            if (parsed.category) category = parsed.category.trim();
+          } catch {
+            // not JSON — treat the whole thing as the answer, category stays "other"
+          }
 
-          await supabaseAdmin.from("messages").insert({
-            conversation_id: conversationId,
-            sender: "ai",
-            body: text,
-            approved: true,
-            source: "ai_direct",
-          });
-          await supabaseAdmin
-            .from("conversations")
-            .update({
-              last_message_at: new Date().toISOString(),
-              status: "open",
-              ...(uncertain ? { needs_staff: true } : {}),
-            })
-            .eq("id", conversationId);
-          return Response.json({ ok: true, uncertain });
+          const uncertain = /team member to help/i.test(answer);
+          const level: Level = uncertain ? "approve" : (ruleMap.get(category.toLowerCase()) ?? defaultLevel);
+
+          if (level === "auto") {
+            await sendToGuest(answer, false);
+            return Response.json({ ok: true, level, category, sent: true });
+          }
+          // suggest / approve (or uncertain) → hand to staff
+          await escalate(answer, category);
+          return Response.json({ ok: true, level, category, escalated: true });
         } catch (e) {
           console.error("concierge error", e);
-          await flagForStaff("Let me get a team member to help you with that.");
-          return Response.json({ ok: true, uncertain: true, error: true });
+          await escalate("Let me get a team member to help you with that.", null);
+          return Response.json({ ok: true, escalated: true, error: true });
         }
       },
     },
