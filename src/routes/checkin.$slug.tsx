@@ -1,5 +1,6 @@
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { ensureGuestSession } from "@/lib/guest-session";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +71,10 @@ function CheckinFlow() {
     if (sigRef.current?.isEmpty()) return toast.error("Please sign");
     setSubmitting(true);
     try {
+      // Anonymous guest session: required so storage uploads + the check-in
+      // insert run as `authenticated` (matching the hardened RLS policies) and
+      // so the check-in is tied to a throttleable identity.
+      const session = await ensureGuestSession();
       let id_document_url: string | null = null;
       let signature_url: string | null = null;
 
@@ -98,6 +103,7 @@ function CheckinFlow() {
         num_guests: form.num_guests,
         id_document_url,
         signature_url,
+        guest_user_id: session.user.id,
         status: "pending",
       }).select("id").single();
       if (error) throw error;

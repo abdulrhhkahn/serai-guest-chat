@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { notificationSupport, requestNotifyPermission, notifyGuest, loadNotifyPrefs, saveNotifyPrefs, type NotifyPrefs, type NotifyPermission } from "@/lib/guest-notifications";
 import { ensureGuestSession } from "@/lib/guest-session";
+import { GuestTurnstile } from "@/components/GuestTurnstile";
 
 
 type StayProperty = { id: string; name: string; slug: string; logo_url: string | null; brand_color: string | null; address: string | null; wifi_ssid: string | null; wifi_password: string | null; checkin_time: string | null; checkout_time: string | null; welcome_message: string | null };
@@ -147,6 +148,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   const [online, setOnline] = useState<boolean>(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const syncingRef = useRef(false);
   const seqRef = useRef<number>(Date.now());
@@ -294,7 +296,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
       },
       // propertyId is intentionally omitted — the server derives it from the
       // verified conversation to prevent cross-property injection.
-      body: JSON.stringify({ conversationId: convId, question: item.body, clientMsgId: item.local_id }),
+      body: JSON.stringify({ conversationId: convId, question: item.body, clientMsgId: item.local_id, turnstileToken }),
     }).catch(() => {});
     return true;
   }
@@ -460,7 +462,10 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
           </div>
         ))}
       </div>
-      <div className="border-t border-border p-2 flex gap-2">
+      <div className="border-t border-border px-2 pt-2">
+        <GuestTurnstile onToken={setTurnstileToken} />
+      </div>
+      <div className="px-2 pb-2 flex gap-2">
         <Input value={text} onChange={(e) => setText(e.target.value)} placeholder={online ? "Type a message…" : "Offline — will queue"} onKeyDown={(e) => { if (e.key === "Enter") send(); }} />
         <Button size="icon" onClick={send} disabled={sending || !text.trim()} style={{ background: brand, color: "white" }}>
           <Send className="h-4 w-4" />
