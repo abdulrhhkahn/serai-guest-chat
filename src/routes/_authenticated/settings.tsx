@@ -130,6 +130,8 @@ function SettingsPage() {
 
       <AutonomyCard propertyId={form.id} />
 
+      <MessagingNumbersCard propertyId={form.id} />
+
       <Card className="p-5">
         <h2 className="font-medium">Guest check-in link</h2>
         <p className="text-sm text-muted-foreground mb-4">Print or share this QR so guests can check in from their phone.</p>
@@ -229,6 +231,82 @@ function AutonomyCard({ propertyId }: { propertyId: string }) {
       )}
       <div className="flex justify-end">
         <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save autonomy"}</Button>
+      </div>
+    </Card>
+  );
+}
+
+function MessagingNumbersCard({ propertyId }: { propertyId: string }) {
+  const qc = useQueryClient();
+  const { data: numbers } = useQuery({
+    queryKey: ["messaging-numbers", propertyId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("messaging_numbers")
+        .select("id, channel, phone_number")
+        .eq("property_id", propertyId)
+        .order("channel");
+      return data ?? [];
+    },
+  });
+
+  const [channel, setChannel] = useState("sms");
+  const [phone, setPhone] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  async function add() {
+    const value = phone.trim();
+    if (!/^\+[1-9]\d{6,15}$/.test(value)) return toast.error("Enter a number in E.164 format, e.g. +14155551234");
+    setAdding(true);
+    const { error } = await supabase.from("messaging_numbers").insert({ property_id: propertyId, channel, phone_number: value });
+    setAdding(false);
+    if (error) return toast.error(error.message);
+    setPhone("");
+    toast.success("Number added");
+    qc.invalidateQueries({ queryKey: ["messaging-numbers", propertyId] });
+  }
+
+  async function remove(id: string) {
+    const { error } = await supabase.from("messaging_numbers").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["messaging-numbers", propertyId] });
+  }
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div>
+        <h2 className="font-medium">Messaging numbers</h2>
+        <p className="text-sm text-muted-foreground">
+          Connect a Twilio SMS or WhatsApp number so guests can text you and replies go back out the same channel.
+          Point that number's webhook at <span className="font-mono text-xs">/api/webhooks/twilio</span>.
+        </p>
+      </div>
+
+      {(numbers?.length ?? 0) > 0 && (
+        <div className="space-y-2">
+          {numbers!.map((n) => (
+            <div key={n.id} className="flex items-center gap-3 text-sm">
+              <span className="rounded-md bg-muted px-2 py-0.5 text-xs uppercase tracking-wide">{n.channel}</span>
+              <span className="font-mono flex-1">{n.phone_number}</span>
+              <Button variant="ghost" size="sm" onClick={() => remove(n.id)}>Remove</Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+        <div>
+          <Label>Channel</Label>
+          <select value={channel} onChange={(e) => setChannel(e.target.value)} className="mt-1 h-10 w-full sm:w-32 rounded-md border border-border bg-background px-3 text-sm">
+            <option value="sms">SMS</option>
+            <option value="whatsapp">WhatsApp</option>
+          </select>
+        </div>
+        <div className="flex-1">
+          <Label>Number (E.164)</Label>
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+14155551234" className="mt-1" />
+        </div>
+        <Button onClick={add} disabled={adding}>{adding ? "Adding…" : "Add"}</Button>
       </div>
     </Card>
   );

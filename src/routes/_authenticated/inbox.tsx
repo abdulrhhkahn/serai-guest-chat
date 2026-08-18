@@ -310,6 +310,16 @@ function InboxPage() {
     });
     if (error) throw error;
     await supabase.from("conversations").update({ last_message_at: new Date().toISOString(), needs_staff: false }).eq("id", conversationId);
+    // Fan out to SMS/WhatsApp if this conversation isn't web-based. Best-effort:
+    // the DB write above already happened; dispatch only sends the outbound leg.
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      await fetch("/api/outbound/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
+        body: JSON.stringify({ conversationId, body: body.trim() }),
+      });
+    } catch { /* non-web dispatch is best-effort */ }
     await logEvent(conversationId, `reply_${source}`, body.trim().slice(0, 200));
   }
 
