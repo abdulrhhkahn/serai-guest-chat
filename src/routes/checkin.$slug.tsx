@@ -182,6 +182,7 @@ function CheckinFlow() {
               <Camera className="h-8 w-8 mx-auto text-muted-foreground" />
               <div className="mt-3 text-sm">{form.id_file ? form.id_file.name : "Tap to take a photo"}</div>
             </label>
+            <p className="text-xs text-muted-foreground">Stored securely and automatically deleted 30 days after checkout.</p>
             <NavButtons brand={brand} onBack={() => setStep(1)} onNext={() => setStep(3)} nextLabel="Continue" />
           </div>
         )}
