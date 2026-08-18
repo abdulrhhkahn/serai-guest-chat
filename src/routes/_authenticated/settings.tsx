@@ -128,6 +128,8 @@ function SettingsPage() {
         <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save changes"}</Button>
       </div>
 
+      <AutonomyCard propertyId={form.id} />
+
       <Card className="p-5">
         <h2 className="font-medium">Guest check-in link</h2>
         <p className="text-sm text-muted-foreground mb-4">Print or share this QR so guests can check in from their phone.</p>
@@ -148,5 +150,86 @@ function SettingsPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+const LEVELS: [string, string][] = [
+  ["suggest", "Suggest only"],
+  ["approve", "Staff approves"],
+  ["auto", "Auto-send"],
+];
+
+function AutonomyCard({ propertyId }: { propertyId: string }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["autonomy", propertyId],
+    queryFn: async () => {
+      const [{ data: prop }, { data: faqs }, { data: rules }] = await Promise.all([
+        supabase.from("properties").select("default_autonomy").eq("id", propertyId).maybeSingle(),
+        supabase.from("faqs").select("category").eq("property_id", propertyId),
+        supabase.from("category_autonomy").select("category, level").eq("property_id", propertyId),
+      ]);
+      const cats = Array.from(new Set((faqs ?? []).map((f) => f.category).filter((c): c is string => !!c)));
+      const ruleMap: Record<string, string> = {};
+      (rules ?? []).forEach((r) => { ruleMap[r.category] = r.level; });
+      return { def: (prop?.default_autonomy as string) ?? "auto", cats, ruleMap };
+    },
+  });
+
+  const [def, setDef] = useState("auto");
+  const [rules, setRules] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { if (data) { setDef(data.def); setRules(data.ruleMap); } }, [data]);
+
+  async function save() {
+    setSaving(true);
+    const { error: e1 } = await supabase.from("properties").update({ default_autonomy: def }).eq("id", propertyId);
+    let e2: { message: string } | null = null;
+    const rows = Object.entries(rules).map(([category, level]) => ({ property_id: propertyId, category, level }));
+    if (rows.length) {
+      const { error } = await supabase.from("category_autonomy").upsert(rows, { onConflict: "property_id,category" });
+      e2 = error;
+    }
+    setSaving(false);
+    if (e1 || e2) return toast.error((e1 ?? e2)!.message);
+    toast.success("Autonomy saved");
+    qc.invalidateQueries({ queryKey: ["autonomy", propertyId] });
+  }
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div>
+        <h2 className="font-medium">AI autonomy</h2>
+        <p className="text-sm text-muted-foreground">
+          How far the concierge can go on its own. Set a default, then override per topic — e.g. auto-answer Wifi, but always approve anything about billing.
+        </p>
+      </div>
+      <div>
+        <Label>Default</Label>
+        <select value={def} onChange={(e) => setDef(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm">
+          {LEVELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      </div>
+      {(data?.cats.length ?? 0) > 0 && (
+        <div className="space-y-2">
+          <Label>Per topic</Label>
+          {data!.cats.map((cat) => (
+            <div key={cat} className="flex items-center gap-3">
+              <span className="text-sm flex-1 truncate">{cat}</span>
+              <select
+                value={rules[cat] ?? def}
+                onChange={(e) => setRules((prev) => ({ ...prev, [cat]: e.target.value }))}
+                className="h-9 w-40 rounded-md border border-border bg-background px-2 text-sm"
+              >
+                {LEVELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex justify-end">
+        <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save autonomy"}</Button>
+      </div>
+    </Card>
   );
 }

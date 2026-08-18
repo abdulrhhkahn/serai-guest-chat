@@ -371,6 +371,33 @@ function InboxPage() {
 
   const active = conversations?.find((c) => c.id === activeId);
 
+  // Pending AI draft for an escalated (non-auto) conversation. Surfaced into the
+  // existing approve/edit/dismiss panel and consumed (deleted) once shown.
+  const { data: activeAiDraft } = useQuery({
+    queryKey: ["ai-draft", activeId],
+    enabled: !!activeId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("ai_drafts")
+        .select("id, draft, category")
+        .eq("conversation_id", activeId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  useEffect(() => {
+    if (activeAiDraft && !suggestion && !loadingSuggestion) {
+      setSuggestion(activeAiDraft.draft);
+      supabase.from("ai_drafts").delete().eq("id", activeAiDraft.id).then(() => {
+        qc.invalidateQueries({ queryKey: ["ai-draft", activeId] });
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAiDraft?.id]);
+
   // Room/stay context for the active conversation, pulled from the linked check-in.
   const { data: activeCheckin } = useQuery({
     queryKey: ["conversation-checkin", active?.checkin_id],
