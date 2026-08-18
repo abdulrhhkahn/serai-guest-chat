@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -23,6 +25,7 @@ type Checkin = {
   arrival_date: string | null;
   departure_date: string | null;
   num_guests: number | null;
+  room: string | null;
   id_document_url: string | null;
   signature_url: string | null;
   status: string;
@@ -66,6 +69,16 @@ function CheckinsPage() {
     toast.success(`Marked ${newStatus}`);
     qc.invalidateQueries({ queryKey: ["checkins"] });
     setSelected((s) => (s ? { ...s, status: newStatus } : s));
+  }
+
+  async function assignRoom(id: string, room: string) {
+    const value = room.trim() || null;
+    const { error } = await supabase.from("checkins").update({ room: value }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success(value ? `Room ${value} assigned` : "Room cleared");
+    qc.invalidateQueries({ queryKey: ["checkins"] });
+    qc.invalidateQueries({ queryKey: ["conversation-checkin"] });
+    setSelected((s) => (s ? { ...s, room: value } : s));
   }
 
   return (
@@ -127,6 +140,20 @@ function CheckinsPage() {
                 <Field label="Departure" value={selected.departure_date} />
                 <Field label="Guests" value={String(selected.num_guests ?? 1)} />
                 <Field label="Status" value={selected.status} />
+
+                <div>
+                  <Label className="text-xs text-muted-foreground">Room</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      defaultValue={selected.room ?? ""}
+                      placeholder="e.g. 204"
+                      key={selected.id}
+                      onBlur={(e) => { if ((e.target.value.trim() || null) !== (selected.room ?? null)) assignRoom(selected.id, e.target.value); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">Shows as stay context in the inbox.</p>
+                </div>
 
                 {idUrl && (
                   <div>

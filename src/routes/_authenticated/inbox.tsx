@@ -27,6 +27,7 @@ type Conversation = {
   property_id: string;
   needs_staff: boolean | null;
   resolved_at: string | null;
+  checkin_id: string | null;
 };
 
 
@@ -370,6 +371,20 @@ function InboxPage() {
 
   const active = conversations?.find((c) => c.id === activeId);
 
+  // Room/stay context for the active conversation, pulled from the linked check-in.
+  const { data: activeCheckin } = useQuery({
+    queryKey: ["conversation-checkin", active?.checkin_id],
+    enabled: !!active?.checkin_id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("checkins")
+        .select("room, arrival_date, departure_date, guest_name, num_guests")
+        .eq("id", active!.checkin_id!)
+        .maybeSingle();
+      return data;
+    },
+  });
+
   return (
     <div className="h-[calc(100vh-3rem)] grid grid-cols-1 md:grid-cols-[320px_1fr]">
       <aside className="border-r border-border overflow-y-auto bg-card/30">
@@ -490,6 +505,27 @@ function InboxPage() {
                   {active.guest_contact ?? "web chat"}
                   {active.resolved_at && ` · marked handled ${formatDistanceToNow(new Date(active.resolved_at), { addSuffix: true })}`}
                 </div>
+                {activeCheckin && (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    {activeCheckin.room && (
+                      <span className="text-[11px] font-medium bg-primary/10 text-primary rounded-md px-2 py-0.5">
+                        Room {activeCheckin.room}
+                      </span>
+                    )}
+                    {activeCheckin.arrival_date && (
+                      <span className="text-[11px] bg-muted text-muted-foreground rounded-md px-2 py-0.5">
+                        {activeCheckin.departure_date
+                          ? `${activeCheckin.arrival_date} → ${activeCheckin.departure_date}`
+                          : `Arrives ${activeCheckin.arrival_date}`}
+                      </span>
+                    )}
+                    {activeCheckin.num_guests ? (
+                      <span className="text-[11px] bg-muted text-muted-foreground rounded-md px-2 py-0.5">
+                        {activeCheckin.num_guests} {activeCheckin.num_guests === 1 ? "guest" : "guests"}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {active.resolved_at ? (
