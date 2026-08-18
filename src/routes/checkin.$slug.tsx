@@ -87,7 +87,7 @@ function CheckinFlow() {
       if (sigErr) throw sigErr;
       signature_url = sigPath;
 
-      const { error } = await supabase.from("checkins").insert({
+      const { data: created, error } = await supabase.from("checkins").insert({
         property_id: property.id,
         guest_name: form.guest_name,
         guest_email: form.guest_email || null,
@@ -99,8 +99,13 @@ function CheckinFlow() {
         id_document_url,
         signature_url,
         status: "pending",
-      });
+      }).select("id").single();
       if (error) throw error;
+      // Remember this check-in so the guest hub can attach it to the chat,
+      // giving staff room/stay context in the inbox.
+      if (typeof localStorage !== "undefined" && created?.id) {
+        localStorage.setItem(`serai-checkin-${property.id}`, created.id);
+      }
       setStep(4);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Something went wrong");

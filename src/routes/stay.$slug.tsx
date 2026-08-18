@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { notificationSupport, requestNotifyPermission, notifyGuest, loadNotifyPrefs, saveNotifyPrefs, type NotifyPrefs, type NotifyPermission } from "@/lib/guest-notifications";
+import { ensureGuestSession } from "@/lib/guest-session";
 
 
 type StayProperty = { id: string; name: string; slug: string; logo_url: string | null; brand_color: string | null; address: string | null; wifi_ssid: string | null; wifi_password: string | null; checkin_time: string | null; checkout_time: string | null; welcome_message: string | null };
@@ -187,15 +188,24 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
 
   useEffect(() => {
     if (!conversationId) return;
-    const loadInitial = async () => {
+    let cancelled = false;
+    let ch: ReturnType<typeof supabase.channel> | null = null;
+
+    (async () => {
+      // RLS now requires the guest's anonymous session for any message read AND
+      // for realtime to pass rows — so establish it BEFORE loading or subscribing.
+      await ensureGuestSession();
+      if (cancelled) return;
+
       const { data } = await supabase.from("messages").select("*").eq("conversation_id", conversationId).order("created_at").order("id");
+      if (cancelled) return;
       setMessages((data ?? []) as Msg[]);
       const { data: conv } = await supabase.from("conversations").select("needs_staff, resolved_at, status").eq("id", conversationId).maybeSingle();
+      if (cancelled) return;
       setNeedsStaff(!!conv?.needs_staff);
       setResolved(!!conv?.resolved_at || conv?.status === "closed");
-    };
-    loadInitial();
-    const ch = supabase.channel(`guest-${conversationId}`)
+
+      ch = supabase.channel(`guest-${conversationId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
           const m = payload.new as Msg;
@@ -226,7 +236,9 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
           }
         })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    })();
+
+    return () => { cancelled = true; if (ch) supabase.removeChannel(ch); };
   }, [conversationId]);
 
 
@@ -236,9 +248,13 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
     if (conversationId) return conversationId;
     const existing = typeof localStorage !== "undefined" ? localStorage.getItem(`serai-conv-${propertyId}`) : null;
     if (existing) { setConversationId(existing); return existing; }
+    const session = await ensureGuestSession();
+    const linkedCheckin = typeof localStorage !== "undefined" ? localStorage.getItem(`serai-checkin-${propertyId}`) : null;
     const { data, error } = await supabase.from("conversations").insert({
       property_id: propertyId,
       guest_name: name || null,
+      guest_user_id: session.user.id,
+      checkin_id: linkedCheckin,
       status: "open",
       last_message_at: new Date().toISOString(),
     }).select("id").single();
@@ -269,10 +285,16 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
     setResolved(false);
 
     setAwaitingAi(true);
+    const { data: { session } } = await supabase.auth.getSession();
     fetch("/api/ai/concierge", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId: convId, propertyId, question: item.body, clientMsgId: item.local_id }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.access_token ?? ""}`,
+      },
+      // propertyId is intentionally omitted — the server derives it from the
+      // verified conversation to prevent cross-property injection.
+      body: JSON.stringify({ conversationId: convId, question: item.body, clientMsgId: item.local_id }),
     }).catch(() => {});
     return true;
   }
