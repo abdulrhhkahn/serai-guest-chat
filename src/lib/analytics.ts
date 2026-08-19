@@ -76,3 +76,33 @@ export function channelVolume(
     .map(([channel, v]) => ({ channel, conversations: convSeen.get(channel)?.size ?? 0, ...v }))
     .sort((a, b) => b.inbound + b.outbound - (a.inbound + a.outbound));
 }
+
+export type DatedDecision = { created_at: string; outcome: string };
+export type DayContainment = { date: string; auto: number; escalated: number; total: number; pct: number };
+
+/**
+ * Containment per day across a fixed set of dates (YYYY-MM-DD, in order).
+ * Every date in `dates` appears in the output even with zero activity, so the
+ * chart has a continuous x-axis. `dateKey` maps a decision's timestamp to a
+ * YYYY-MM-DD bucket (pass a timezone-aware formatter from the caller).
+ */
+export function containmentByDay(
+  decisions: DatedDecision[],
+  dates: string[],
+  dateKey: (iso: string) => string,
+): DayContainment[] {
+  const map = new Map<string, { auto: number; escalated: number }>();
+  for (const d of dates) map.set(d, { auto: 0, escalated: 0 });
+  for (const dec of decisions) {
+    const key = dateKey(dec.created_at);
+    const bucket = map.get(key);
+    if (!bucket) continue;
+    if (dec.outcome === "auto") bucket.auto++;
+    else bucket.escalated++;
+  }
+  return dates.map((date) => {
+    const v = map.get(date)!;
+    const total = v.auto + v.escalated;
+    return { date, auto: v.auto, escalated: v.escalated, total, pct: total ? Math.round((v.auto / total) * 100) : 0 };
+  });
+}
