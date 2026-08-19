@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { deliveryLabel } from "@/lib/delivery";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
@@ -40,6 +41,8 @@ type Message = {
   source: string | null;
   sender_user_id: string | null;
   original_draft: string | null;
+  delivery_status: string | null;
+  delivery_error: string | null;
 };
 
 type Template = { id: string; title: string; body: string; category: string | null };
@@ -297,9 +300,22 @@ function InboxPage() {
   }
 
 
+  async function retryMessage(m: Message) {
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      await supabase.from("messages").update({ delivery_status: "queued", delivery_error: null }).eq("id", m.id);
+      await fetch("/api/outbound/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
+        body: JSON.stringify({ conversationId: m.conversation_id, body: m.body, messageId: m.id }),
+      });
+      qc.invalidateQueries({ queryKey: ["messages", m.conversation_id] });
+    } catch { /* best-effort */ }
+  }
+
   async function sendTo(conversationId: string, body: string, source: "manual" | "ai_draft_approved" | "ai_draft_edited" | "template", originalDraft?: string | null) {
     const { data: u } = await supabase.auth.getUser();
-    const { error } = await supabase.from("messages").insert({
+    const { data: inserted, error } = await supabase.from("messages").insert({
       conversation_id: conversationId,
       sender: "staff",
       body: body.trim(),
@@ -307,7 +323,7 @@ function InboxPage() {
       source,
       sender_user_id: u.user?.id ?? null,
       original_draft: originalDraft ?? null,
-    });
+    }).select("id").single();
     if (error) throw error;
     await supabase.from("conversations").update({ last_message_at: new Date().toISOString(), needs_staff: false }).eq("id", conversationId);
     // Fan out to SMS/WhatsApp if this conversation isn't web-based. Best-effort:
@@ -317,7 +333,7 @@ function InboxPage() {
       await fetch("/api/outbound/dispatch", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
-        body: JSON.stringify({ conversationId, body: body.trim() }),
+        body: JSON.stringify({ conversationId, body: body.trim(), messageId: inserted?.id }),
       });
     } catch { /* non-web dispatch is best-effort */ }
     await logEvent(conversationId, `reply_${source}`, body.trim().slice(0, 200));
@@ -593,6 +609,20 @@ function InboxPage() {
                   }`}>
                     {m.sender === "ai" && <div className="text-[10px] uppercase tracking-wide mb-1 opacity-70">AI · guest concierge</div>}
                     <div className="whitespace-pre-wrap">{m.body}</div>
+                    {(() => {
+                      if (m.sender === "guest") return null;
+                      const d = deliveryLabel(m.delivery_status, m.delivery_error);
+                      if (d.tone === "none") return null;
+                      const cls = d.tone === "ok" ? "opacity-70" : d.tone === "error" ? "text-red-200" : "opacity-60";
+                      return (
+                        <div className={`mt-1 text-[10px] flex items-center gap-2 justify-end ${m.sender === "staff" ? cls : (d.tone === "error" ? "text-red-600" : "opacity-60")}`}>
+                          <span>{d.label}</span>
+                          {d.failed && (
+                            <button className="underline hover:no-underline" onClick={() => retryMessage(m)}>Retry</button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
