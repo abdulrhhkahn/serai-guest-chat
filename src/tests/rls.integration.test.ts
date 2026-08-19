@@ -188,3 +188,50 @@ describe.skipIf(!run)("DB-enforced guarantees (v3–v8)", () => {
     expect(dup.error, "duplicate external_id should be rejected").not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Organisation / group access (v17). Org admins read across their own org's
+// properties; agents and other orgs get nothing new. Gated like the rest.
+// ---------------------------------------------------------------------------
+describe.skipIf(!run)("Organisation / group access (v17)", () => {
+  it("an org admin reads other properties in their org, but not other orgs", async () => {
+    const a = admin();
+    const { data: org1 } = await a.from("organizations").insert({ name: `Org1-${Date.now()}` }).select("id").single();
+    const { data: org2 } = await a.from("organizations").insert({ name: `Org2-${Date.now()}` }).select("id").single();
+    const pA = await newProperty("orgA");
+    const pB = await newProperty("orgB");
+    const pC = await newProperty("orgC");
+    await a.from("properties").update({ organization_id: org1!.id }).in("id", [pA, pB]);
+    await a.from("properties").update({ organization_id: org2!.id }).eq("id", pC);
+
+    // A staff member of pA, promoted to admin of org1.
+    const staffA = await newStaff(pA, "admin");
+    await a.from("org_admins").insert({ org_id: org1!.id, user_id: staffA.uid });
+
+    const { data: convB } = await a.from("conversations").insert({ property_id: pB, status: "open" }).select("id").single();
+    const { data: convC } = await a.from("conversations").insert({ property_id: pC, status: "open" }).select("id").single();
+    await a.from("ai_decisions").insert({ property_id: pB, conversation_id: convB!.id, channel: "web", level: "auto", outcome: "auto" });
+    await a.from("ai_decisions").insert({ property_id: pC, conversation_id: convC!.id, channel: "web", level: "auto", outcome: "auto" });
+
+    const sameOrg = await staffA.client.from("ai_decisions").select("id").eq("property_id", pB);
+    expect((sameOrg.data ?? []).length, "org admin should read same-org property").toBeGreaterThan(0);
+
+    const otherOrg = await staffA.client.from("ai_decisions").select("id").eq("property_id", pC);
+    expect(otherOrg.data ?? [], "org admin must NOT read a different org").toHaveLength(0);
+  });
+
+  it("a regular agent gains no cross-property access from the org model", async () => {
+    const a = admin();
+    const { data: org } = await a.from("organizations").insert({ name: `Org-${Date.now()}` }).select("id").single();
+    const pA = await newProperty("agentA");
+    const pB = await newProperty("agentB");
+    await a.from("properties").update({ organization_id: org!.id }).in("id", [pA, pB]);
+
+    const agentA = await newStaff(pA, "agent"); // NOT an org admin
+    const { data: convB } = await a.from("conversations").insert({ property_id: pB, status: "open" }).select("id").single();
+    await a.from("ai_decisions").insert({ property_id: pB, conversation_id: convB!.id, channel: "web", level: "auto", outcome: "auto" });
+
+    const res = await agentA.client.from("ai_decisions").select("id").eq("property_id", pB);
+    expect(res.data ?? [], "an agent stays scoped to their own property").toHaveLength(0);
+  });
+});
