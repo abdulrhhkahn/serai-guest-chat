@@ -25,3 +25,13 @@ export function csatSummary(ratings: (number | null | undefined)[]): CsatSummary
     positivePct: count ? Math.round((positive / count) * 100) : 0,
   };
 }
+
+/**
+ * Interpret an inbound SMS/WhatsApp body as a CSAT reply: a bare 1–5.
+ * Returns the number, or null if it isn't a rating (so it's treated as a normal
+ * question instead). Tolerates surrounding whitespace and a trailing "star(s)".
+ */
+export function parseCsatReply(body: string): number | null {
+  const m = (body ?? "").trim().match(/^([1-5])(?:\s*stars?)?$/i);
+  return m ? Number(m[1]) : null;
+}
