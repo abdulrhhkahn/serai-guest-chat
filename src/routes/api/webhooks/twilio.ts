@@ -48,12 +48,16 @@ export const Route = createFileRoute("/api/webhooks/twilio")({
 
         // 4. Find or create the conversation for this guest number.
         let conversationId: string;
+        let convResolvedAt: string | null = null;
+        let convCsat: number | null = null;
         const { data: existing } = await supabaseAdmin
-          .from("conversations").select("id")
+          .from("conversations").select("id, resolved_at, status, csat_rating")
           .eq("property_id", propertyId).eq("channel", channel).eq("guest_contact", from)
           .maybeSingle();
         if (existing) {
           conversationId = existing.id;
+          convResolvedAt = existing.resolved_at ?? (existing.status === "closed" ? "closed" : null);
+          convCsat = existing.csat_rating ?? null;
         } else {
           const { data: created, error } = await supabaseAdmin.from("conversations").insert({
             property_id: propertyId, channel, guest_contact: from,
@@ -70,6 +74,19 @@ export const Route = createFileRoute("/api/webhooks/twilio")({
         });
         await supabaseAdmin.from("conversations")
           .update({ last_message_at: new Date().toISOString() }).eq("id", conversationId);
+
+        // 5b. CSAT: if the conversation is resolved and unrated and the guest
+        //     texted a bare 1–5, record it as a rating instead of a question.
+        if (convResolvedAt && convCsat == null) {
+          const { parseCsatReply } = await import("@/lib/csat");
+          const rating = parseCsatReply(body);
+          if (rating != null) {
+            await supabaseAdmin.from("conversations")
+              .update({ csat_rating: rating, csat_at: new Date().toISOString() }).eq("id", conversationId);
+            await sendTwilioMessage({ channel, to: from, from: to, body: "Thanks for the feedback!", statusCallback: statusCallbackUrl() });
+            return xml();
+          }
+        }
 
         // 6. Rate limit AI replies per guest number.
         const { data: allowed } = await supabaseAdmin.rpc("check_rate_limit", {
