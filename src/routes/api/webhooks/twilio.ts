@@ -1,0 +1,117 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { verifyTwilioSignature, sendTwilioMessage, type Channel } from "@/lib/twilio.server";
+import { classifyAndAnswer } from "@/lib/concierge-core.server";
+
+function xml(body = "<Response></Response>") {
+  return new Response(body, { status: 200, headers: { "Content-Type": "text/xml" } });
+}
+const strip = (n: string) => n.replace(/^whatsapp:/, "").trim();
+
+export const Route = createFileRoute("/api/webhooks/twilio")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const raw = await request.text();
+        const params = Object.fromEntries(new URLSearchParams(raw)) as Record<string, string>;
+
+        // 1. Verify the request really came from Twilio.
+        const url = process.env.TWILIO_WEBHOOK_URL || request.url;
+        const ok = await verifyTwilioSignature(url, params, request.headers.get("x-twilio-signature"));
+        if (!ok) return new Response("Invalid signature", { status: 403 });
+
+        const from = strip(params.From ?? "");
+        const to = strip(params.To ?? "");
+        const body = (params.Body ?? "").trim();
+        const sid = params.MessageSid ?? params.SmsSid ?? "";
+        const channel: Channel = (params.From ?? "").startsWith("whatsapp:") ? "whatsapp" : "sms";
+        if (!from || !to || !body) return xml();
+
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        // 2. Map the hotel's number → property.
+        const { data: num } = await supabaseAdmin
+          .from("messaging_numbers")
+          .select("property_id")
+          .eq("channel", channel)
+          .eq("phone_number", to)
+          .maybeSingle();
+        if (!num) return xml(); // unknown number — ignore
+
+        const propertyId = num.property_id;
+
+        // 3. Idempotency: Twilio retries webhooks.
+        if (sid) {
+          const { data: dup } = await supabaseAdmin
+            .from("messages").select("id").eq("external_id", sid).maybeSingle();
+          if (dup) return xml();
+        }
+
+        // 4. Find or create the conversation for this guest number.
+        let conversationId: string;
+        const { data: existing } = await supabaseAdmin
+          .from("conversations").select("id")
+          .eq("property_id", propertyId).eq("channel", channel).eq("guest_contact", from)
+          .maybeSingle();
+        if (existing) {
+          conversationId = existing.id;
+        } else {
+          const { data: created, error } = await supabaseAdmin.from("conversations").insert({
+            property_id: propertyId, channel, guest_contact: from,
+            status: "open", last_message_at: new Date().toISOString(),
+          }).select("id").single();
+          if (error || !created) return xml();
+          conversationId = created.id;
+        }
+
+        // 5. Store the inbound message.
+        await supabaseAdmin.from("messages").insert({
+          conversation_id: conversationId, sender: "guest", body,
+          approved: true, source: channel, external_id: sid || null,
+        });
+        await supabaseAdmin.from("conversations")
+          .update({ last_message_at: new Date().toISOString() }).eq("id", conversationId);
+
+        // 6. Rate limit AI replies per guest number.
+        const { data: allowed } = await supabaseAdmin.rpc("check_rate_limit", {
+          _bucket: `inbound_${channel}`, _identity: from, _max: 15, _window_secs: 60,
+        });
+        if (allowed === false) return xml();
+
+        // 7. Autonomy pipeline.
+        try {
+          const { answer, category, level } = await classifyAndAnswer({ supabaseAdmin, propertyId, question: body });
+
+          if (level === "auto") {
+            const sent = await sendTwilioMessage({ channel, to: from, from: to, body: answer });
+            await supabaseAdmin.from("messages").insert({
+              conversation_id: conversationId, sender: "ai", body: answer,
+              approved: true, source: "ai_direct", external_id: sent.sid ?? null,
+            });
+            await supabaseAdmin.from("conversations")
+              .update({ last_message_at: new Date().toISOString(), status: "open" }).eq("id", conversationId);
+            await supabaseAdmin.from("ai_decisions").insert({
+              property_id: propertyId, conversation_id: conversationId, channel, category, level, outcome: "auto",
+            });
+          } else {
+            // escalate — staff will reply from the inbox (which dispatches out)
+            await supabaseAdmin.from("ai_drafts").insert({
+              conversation_id: conversationId, property_id: propertyId, category, draft: answer,
+            });
+            await supabaseAdmin.from("conversations")
+              .update({ last_message_at: new Date().toISOString(), status: "open", needs_staff: true })
+              .eq("id", conversationId);
+            await supabaseAdmin.from("ai_decisions").insert({
+              property_id: propertyId, conversation_id: conversationId, channel, category, level, outcome: "escalated",
+            });
+          }
+        } catch (e) {
+          console.error("twilio webhook AI error", e);
+          await supabaseAdmin.from("conversations")
+            .update({ needs_staff: true }).eq("id", conversationId);
+        }
+
+        return xml();
+      },
+    },
+  },
+});
