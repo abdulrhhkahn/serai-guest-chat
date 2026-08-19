@@ -16,6 +16,11 @@ export function twilioConfigured(): boolean {
   return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
 }
 
+/** Public URL Twilio should POST delivery-status updates to (opt-in via env). */
+export function statusCallbackUrl(): string | undefined {
+  return process.env.TWILIO_STATUS_CALLBACK_URL || undefined;
+}
+
 /**
  * Validate the X-Twilio-Signature header for an incoming webhook.
  * Algorithm: HMAC-SHA1(authToken, url + sorted(key+value...)) → base64.
@@ -54,6 +59,7 @@ export async function sendTwilioMessage(opts: {
   to: string;
   from: string;
   body: string;
+  statusCallback?: string;
 }): Promise<{ ok: boolean; sid?: string; error?: string }> {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
@@ -65,6 +71,7 @@ export async function sendTwilioMessage(opts: {
     From: `${pfx}${opts.from}`,
     Body: opts.body,
   });
+  if (opts.statusCallback) form.set("StatusCallback", opts.statusCallback);
 
   const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
     method: "POST",
