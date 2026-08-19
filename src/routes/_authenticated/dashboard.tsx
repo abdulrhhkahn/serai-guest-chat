@@ -2,8 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, ClipboardList, MessageSquare, Users, Sparkles } from "lucide-react";
+import { CalendarDays, ClipboardList, MessageSquare, Users, Sparkles, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import { Link } from "@tanstack/react-router";
+import { deliveryAlerts } from "@/lib/delivery-alerts";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -51,6 +53,22 @@ function Dashboard() {
     },
   });
 
+  const { data: deliveryRows } = useQuery({
+    queryKey: ["dashboard-delivery"],
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
+      const { data } = await supabase
+        .from("messages")
+        .select("conversation_id, delivery_status, created_at")
+        .not("delivery_status", "is", null)
+        .gte("created_at", since);
+      return data ?? [];
+    },
+  });
+
+  const alerts = deliveryAlerts(deliveryRows ?? []);
+
   const { data: todaysGuests } = useQuery({
     queryKey: ["todays-guests", today],
     queryFn: async () => {
@@ -69,6 +87,30 @@ function Dashboard() {
         <h1 className="font-serif text-3xl">Good day.</h1>
         <p className="text-sm text-muted-foreground">Here's what's happening today.</p>
       </div>
+
+      {alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.map((a, i) => (
+            <div
+              key={i}
+              className={`flex items-start gap-3 rounded-lg border p-3 ${
+                a.severity === "critical"
+                  ? "border-red-300 bg-red-50 text-red-900"
+                  : "border-amber-300 bg-amber-50 text-amber-900"
+              }`}
+            >
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div className="flex-1 text-sm">
+                <div className="font-medium">{a.title}</div>
+                <div className="opacity-80">{a.detail}</div>
+              </div>
+              <Link to="/inbox" className="text-sm font-medium underline hover:no-underline shrink-0">
+                Open inbox
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Today's arrivals" value={stats?.arrivals ?? 0} icon={<CalendarDays className="h-4 w-4" />} />
