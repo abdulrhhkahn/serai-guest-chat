@@ -27,6 +27,7 @@ type Property = {
   checkin_time: string | null;
   checkout_time: string | null;
   welcome_message: string | null;
+  report_email: string | null;
 };
 
 function SettingsPage() {
@@ -63,6 +64,7 @@ function SettingsPage() {
       checkin_time: form.checkin_time,
       checkout_time: form.checkout_time,
       welcome_message: form.welcome_message,
+      report_email: form.report_email,
     }).eq("id", form.id);
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -121,6 +123,11 @@ function SettingsPage() {
           <div><Label>Wifi SSID</Label><Input value={form.wifi_ssid ?? ""} onChange={(e) => setForm({ ...form, wifi_ssid: e.target.value })} /></div>
           <div><Label>Wifi password</Label><Input value={form.wifi_password ?? ""} onChange={(e) => setForm({ ...form, wifi_password: e.target.value })} /></div>
           <div><Label>Welcome message</Label><Textarea value={form.welcome_message ?? ""} onChange={(e) => setForm({ ...form, welcome_message: e.target.value })} rows={3} /></div>
+          <div>
+            <Label>Weekly report email</Label>
+            <Input value={form.report_email ?? ""} onChange={(e) => setForm({ ...form, report_email: e.target.value })} placeholder="manager@hotel.com, frontdesk@hotel.com" />
+            <p className="text-[11px] text-muted-foreground mt-1">Comma-separated. Gets a weekly analytics summary. Leave blank to turn off.</p>
+          </div>
         </Card>
       </div>
 
