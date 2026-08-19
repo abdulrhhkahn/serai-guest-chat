@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { notificationSupport, requestNotifyPermission, notifyGuest, loadNotifyPrefs, saveNotifyPrefs, type NotifyPrefs, type NotifyPermission } from "@/lib/guest-notifications";
 import { ensureGuestSession } from "@/lib/guest-session";
+import { GuestTurnstile } from "@/components/GuestTurnstile";
 
 
 type StayProperty = { id: string; name: string; slug: string; logo_url: string | null; brand_color: string | null; address: string | null; wifi_ssid: string | null; wifi_password: string | null; checkin_time: string | null; checkout_time: string | null; welcome_message: string | null };
@@ -131,6 +132,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   const [messages, setMessages] = useState<Msg[]>([]);
   const [needsStaff, setNeedsStaff] = useState(false);
   const [resolved, setResolved] = useState(false);
+  const [csatRating, setCsatRating] = useState<number | null>(null);
   const [notifyState, setNotifyState] = useState<NotifyPermission>("unsupported");
   const [notifyPrefs, setNotifyPrefs] = useState<NotifyPrefs>({ ai: true, staff: true, resolved: true });
   const [awaitingAi, setAwaitingAi] = useState(false);
@@ -147,6 +149,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   const [online, setOnline] = useState<boolean>(() => typeof navigator === "undefined" ? true : navigator.onLine);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const syncingRef = useRef(false);
   const seqRef = useRef<number>(Date.now());
@@ -200,10 +203,11 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
       const { data } = await supabase.from("messages").select("*").eq("conversation_id", conversationId).order("created_at").order("id");
       if (cancelled) return;
       setMessages((data ?? []) as Msg[]);
-      const { data: conv } = await supabase.from("conversations").select("needs_staff, resolved_at, status").eq("id", conversationId).maybeSingle();
+      const { data: conv } = await supabase.from("conversations").select("needs_staff, resolved_at, status, csat_rating").eq("id", conversationId).maybeSingle();
       if (cancelled) return;
       setNeedsStaff(!!conv?.needs_staff);
       setResolved(!!conv?.resolved_at || conv?.status === "closed");
+      setCsatRating(conv?.csat_rating ?? null);
 
       ch = supabase.channel(`guest-${conversationId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
@@ -249,10 +253,12 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
     const existing = typeof localStorage !== "undefined" ? localStorage.getItem(`serai-conv-${propertyId}`) : null;
     if (existing) { setConversationId(existing); return existing; }
     const session = await ensureGuestSession();
+    const linkedCheckin = typeof localStorage !== "undefined" ? localStorage.getItem(`serai-checkin-${propertyId}`) : null;
     const { data, error } = await supabase.from("conversations").insert({
       property_id: propertyId,
       guest_name: name || null,
       guest_user_id: session.user.id,
+      checkin_id: linkedCheckin,
       status: "open",
       last_message_at: new Date().toISOString(),
     }).select("id").single();
@@ -292,7 +298,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
       },
       // propertyId is intentionally omitted — the server derives it from the
       // verified conversation to prevent cross-property injection.
-      body: JSON.stringify({ conversationId: convId, question: item.body, clientMsgId: item.local_id }),
+      body: JSON.stringify({ conversationId: convId, question: item.body, clientMsgId: item.local_id, turnstileToken }),
     }).catch(() => {});
     return true;
   }
@@ -458,7 +464,36 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
           </div>
         ))}
       </div>
-      <div className="border-t border-border p-2 flex gap-2">
+      {resolved && conversationId && (
+        csatRating ? (
+          <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground text-center">
+            Thanks for your feedback — you rated this {csatRating}/5.
+          </div>
+        ) : (
+          <div className="border-t border-border px-3 py-2 text-center">
+            <div className="text-xs text-muted-foreground mb-1">How did we do?</div>
+            <div className="flex justify-center gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  aria-label={`Rate ${n} out of 5`}
+                  className="text-xl leading-none opacity-60 hover:opacity-100 transition-opacity"
+                  onClick={async () => {
+                    setCsatRating(n);
+                    await supabase.from("conversations").update({ csat_rating: n, csat_at: new Date().toISOString() }).eq("id", conversationId);
+                  }}
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      )}
+      <div className="border-t border-border px-2 pt-2">
+        <GuestTurnstile onToken={setTurnstileToken} />
+      </div>
+      <div className="px-2 pb-2 flex gap-2">
         <Input value={text} onChange={(e) => setText(e.target.value)} placeholder={online ? "Type a message…" : "Offline — will queue"} onKeyDown={(e) => { if (e.key === "Enter") send(); }} />
         <Button size="icon" onClick={send} disabled={sending || !text.trim()} style={{ background: brand, color: "white" }}>
           <Send className="h-4 w-4" />
