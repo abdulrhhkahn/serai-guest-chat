@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { format, subDays, parseISO, eachDayOfInterval } from "date-fns";
-import { containmentByTopic, overallContainment, channelVolume } from "@/lib/analytics";
+import { containmentByTopic, overallContainment, channelVolume, containmentByDay } from "@/lib/analytics";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   component: AnalyticsPage,
@@ -226,6 +226,18 @@ function AnalyticsPage() {
   );
   const topicStats = useMemo(() => containmentByTopic(decisionRows), [decisionRows]);
   const containment = useMemo(() => overallContainment(decisionRows), [decisionRows]);
+
+  // Containment trend over the selected range (uses the same `days` axis as the
+  // Replies-by-day chart). date-fns parseISO/format give local-day buckets.
+  const containmentTrend = useMemo(() => {
+    const dateStrs = days.map((d) => format(d, "yyyy-MM-dd"));
+    return containmentByDay(
+      decisionRows.map((d) => ({ created_at: d.created_at, outcome: d.outcome })),
+      dateStrs,
+      (iso) => format(parseISO(iso), "yyyy-MM-dd"),
+    );
+  }, [decisionRows, days]);
+  const trendHasData = useMemo(() => containmentTrend.some((d) => d.total > 0), [containmentTrend]);
 
   // Channel mix, filtered by property.
   const channelRows = useMemo(() => {
@@ -554,6 +566,57 @@ function AnalyticsPage() {
           </Card>
         </div>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">AI containment over time</CardTitle></CardHeader>
+        <CardContent>
+          {!trendHasData ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">No AI decisions in this range yet. As the concierge answers questions, this shows the share handled without staff — the line rising means the AI is graduating to auto.</p>
+          ) : (() => {
+            const W = 720, H = 180, padL = 28, padB = 22, padT = 8;
+            const n = containmentTrend.length;
+            const innerW = W - padL - 8;
+            const innerH = H - padB - padT;
+            const maxVol = Math.max(1, ...containmentTrend.map((d) => d.total));
+            const x = (i: number) => padL + (n <= 1 ? innerW / 2 : (i * innerW) / (n - 1));
+            const y = (pct: number) => padT + innerH - (pct / 100) * innerH;
+            const barW = Math.max(2, (innerW / Math.max(n, 1)) * 0.5);
+            // Only connect days that actually had questions — a quiet day is a
+            // gap, not a crash to 0% containment.
+            const active = containmentTrend.map((d, i) => ({ d, i })).filter((o) => o.d.total > 0);
+            const linePts = active.map((o) => `${x(o.i)},${y(o.d.pct)}`).join(" ");
+            return (
+              <div>
+                <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="AI containment percentage per day">
+                  {[0, 25, 50, 75, 100].map((g) => (
+                    <g key={g}>
+                      <line x1={padL} x2={W - 8} y1={y(g)} y2={y(g)} stroke="currentColor" className="text-border" strokeWidth={1} />
+                      <text x={0} y={y(g) + 3} className="fill-muted-foreground" fontSize={9}>{g}</text>
+                    </g>
+                  ))}
+                  {containmentTrend.map((d, i) => (
+                    <rect key={d.date} x={x(i) - barW / 2} y={padT + innerH - (d.total / maxVol) * innerH}
+                      width={barW} height={(d.total / maxVol) * innerH}
+                      className="fill-muted" opacity={0.5} />
+                  ))}
+                  <polyline points={linePts} fill="none" stroke="currentColor" className="text-primary" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                  {containmentTrend.map((d, i) => d.total > 0 ? (
+                    <circle key={d.date} cx={x(i)} cy={y(d.pct)} r={2.5} className="fill-primary" />
+                  ) : null)}
+                </svg>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-1 px-1">
+                  <span>{containmentTrend[0]?.date}</span>
+                  <span className="flex items-center gap-3">
+                    <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-primary align-middle" /> containment %</span>
+                    <span className="inline-flex items-center gap-1"><span className="inline-block w-2 h-2 bg-muted align-middle" /> question volume</span>
+                  </span>
+                  <span>{containmentTrend[n - 1]?.date}</span>
+                </div>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-base">Replies by day</CardTitle></CardHeader>
