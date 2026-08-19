@@ -75,3 +75,42 @@ describe("channelVolume", () => {
     expect(channelVolume(convChannels, messages)[0].channel).toBe("whatsapp");
   });
 });
+
+import { containmentByDay } from "../analytics";
+
+describe("containmentByDay", () => {
+  const key = (iso: string) => iso.slice(0, 10); // UTC day for tests
+
+  it("buckets decisions per day and fills empty days", () => {
+    const decisions = [
+      { created_at: "2026-08-01T09:00:00Z", outcome: "auto" },
+      { created_at: "2026-08-01T10:00:00Z", outcome: "auto" },
+      { created_at: "2026-08-01T11:00:00Z", outcome: "escalated" },
+      { created_at: "2026-08-03T09:00:00Z", outcome: "escalated" },
+    ];
+    const rows = containmentByDay(decisions, ["2026-08-01", "2026-08-02", "2026-08-03"], key);
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toEqual({ date: "2026-08-01", auto: 2, escalated: 1, total: 3, pct: 67 });
+    expect(rows[1]).toEqual({ date: "2026-08-02", auto: 0, escalated: 0, total: 0, pct: 0 });
+    expect(rows[2]).toEqual({ date: "2026-08-03", auto: 0, escalated: 1, total: 1, pct: 0 });
+  });
+
+  it("ignores decisions outside the given dates", () => {
+    const rows = containmentByDay(
+      [{ created_at: "2026-07-30T00:00:00Z", outcome: "auto" }],
+      ["2026-08-01"],
+      key,
+    );
+    expect(rows[0].total).toBe(0);
+  });
+
+  it("shows the trend rising as auto share grows", () => {
+    const decisions = [
+      { created_at: "2026-08-01T00:00:00Z", outcome: "escalated" },
+      { created_at: "2026-08-02T00:00:00Z", outcome: "auto" },
+    ];
+    const rows = containmentByDay(decisions, ["2026-08-01", "2026-08-02"], key);
+    expect(rows[0].pct).toBe(0);
+    expect(rows[1].pct).toBe(100);
+  });
+});
