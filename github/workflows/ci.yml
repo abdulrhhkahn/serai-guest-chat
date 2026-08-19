@@ -24,21 +24,25 @@ jobs:
       - name: Build
         run: bun run build
 
-  # Optional: RLS integration tests against a throwaway Supabase.
-  # Enable by uncommenting and setting up a local stack in CI.
-  #
-  # integration:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: oven-sh/setup-bun@v2
-  #     - uses: supabase/setup-cli@v1
-  #     - run: supabase start
-  #     - run: supabase db reset       # applies migrations + seed
-  #     - run: bun install --frozen-lockfile
-  #     - name: RLS integration tests
-  #       run: bun run test:integration
-  #       env:
-  #         TEST_SUPABASE_URL: http://127.0.0.1:54321
-  #         TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
-  #         TEST_SUPABASE_SERVICE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_KEY }}
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Install deps
+        run: bun install --frozen-lockfile
+      # Requires supabase/config.toml → [auth] enable_anonymous_sign_ins = true
+      - name: Start Supabase (applies migrations)
+        run: supabase start
+      - name: Export local keys
+        run: |
+          echo "TEST_SUPABASE_URL=$(supabase status -o json | jq -r .API_URL)" >> "$GITHUB_ENV"
+          echo "TEST_SUPABASE_ANON_KEY=$(supabase status -o json | jq -r .ANON_KEY)" >> "$GITHUB_ENV"
+          echo "TEST_SUPABASE_SERVICE_KEY=$(supabase status -o json | jq -r .SERVICE_ROLE_KEY)" >> "$GITHUB_ENV"
+      - name: RLS integration tests
+        run: bun run test:integration
