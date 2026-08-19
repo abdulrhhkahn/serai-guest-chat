@@ -24,3 +24,20 @@ describe("csatSummary", () => {
     expect(csatSummary([5, 4, 4]).average).toBe(4.3); // 13/3 = 4.333…
   });
 });
+
+import { parseCsatReply } from "../csat";
+
+describe("parseCsatReply", () => {
+  it("parses a bare 1-5", () => {
+    expect(parseCsatReply("5")).toBe(5);
+    expect(parseCsatReply(" 3 ")).toBe(3);
+    expect(parseCsatReply("4 stars")).toBe(4);
+  });
+  it("rejects non-ratings", () => {
+    expect(parseCsatReply("hello")).toBeNull();
+    expect(parseCsatReply("6")).toBeNull();
+    expect(parseCsatReply("0")).toBeNull();
+    expect(parseCsatReply("5 please")).toBeNull();
+    expect(parseCsatReply("")).toBeNull();
+  });
+});
