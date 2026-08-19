@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { format, subDays, parseISO, eachDayOfInterval } from "date-fns";
+import { containmentByTopic, overallContainment, channelVolume } from "@/lib/analytics";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   component: AnalyticsPage,
@@ -28,6 +29,16 @@ type ConvRow = {
   guest_name: string | null;
   needs_staff: boolean | null;
   resolved_at: string | null;
+  channel: string | null;
+};
+
+type DecisionRow = {
+  property_id: string;
+  category: string | null;
+  level: string;
+  outcome: string;
+  channel: string | null;
+  created_at: string;
 };
 
 function fmtDuration(ms: number | null): string {
@@ -94,8 +105,28 @@ function AnalyticsPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("conversations")
-        .select("id, property_id, guest_name, needs_staff, resolved_at");
+        .select("id, property_id, guest_name, needs_staff, resolved_at, channel");
       return (data ?? []) as ConvRow[];
+    },
+  });
+
+  const { data: decisions } = useQuery({
+    queryKey: ["analytics-decisions", range.start, range.end],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("ai_decisions")
+        .select("property_id, category, level, outcome, channel, created_at")
+        .gte("created_at", range.start)
+        .lte("created_at", range.end);
+      return (data ?? []) as DecisionRow[];
+    },
+  });
+
+  const { data: autonomyRules } = useQuery({
+    queryKey: ["analytics-autonomy"],
+    queryFn: async () => {
+      const { data } = await supabase.from("category_autonomy").select("property_id, category, level");
+      return data ?? [];
     },
   });
 
@@ -187,6 +218,32 @@ function AnalyticsPage() {
     const total = ai + staffCount;
     return { ai, staff: staffCount, total, aiPct: total ? Math.round((ai / total) * 100) : 0 };
   }, [replyRows]);
+
+  // AI containment (from the durable decision log), filtered by property.
+  const decisionRows = useMemo(
+    () => (decisions ?? []).filter((d) => propertyId === "all" || d.property_id === propertyId),
+    [decisions, propertyId],
+  );
+  const topicStats = useMemo(() => containmentByTopic(decisionRows), [decisionRows]);
+  const containment = useMemo(() => overallContainment(decisionRows), [decisionRows]);
+
+  // Channel mix, filtered by property.
+  const channelRows = useMemo(() => {
+    const convChannels = new Map<string, string>();
+    for (const c of convs ?? []) {
+      if (propertyId !== "all" && c.property_id !== propertyId) continue;
+      convChannels.set(c.id, c.channel || "web");
+    }
+    return channelVolume(convChannels, rows.map((r) => ({ conversation_id: r.conversation_id, sender: r.sender })));
+  }, [convs, rows, propertyId]);
+
+  // Trust configuration snapshot: how many topics sit at each autonomy level.
+  const trustConfig = useMemo(() => {
+    const filtered = (autonomyRules ?? []).filter((r) => propertyId === "all" || r.property_id === propertyId);
+    const counts = { suggest: 0, approve: 0, auto: 0 } as Record<string, number>;
+    for (const r of filtered) if (counts[r.level] !== undefined) counts[r.level]++;
+    return { counts, total: filtered.length };
+  }, [autonomyRules, propertyId]);
 
   /**
    * Wait-time metrics for the "Needs attention" queue.
@@ -416,6 +473,87 @@ function AnalyticsPage() {
           )}
         </CardContent>
       </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle className="text-base">AI containment by topic</CardTitle></CardHeader>
+          <CardContent>
+            <div className="mb-4 flex items-baseline gap-2">
+              <span className="text-3xl font-semibold">{containment}%</span>
+              <span className="text-sm text-muted-foreground">handled by AI without staff ({decisionRows.length} question{decisionRows.length === 1 ? "" : "s"})</span>
+            </div>
+            {topicStats.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No AI decisions in this range yet. Topics appear here once the concierge answers questions.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs text-muted-foreground border-b border-border">
+                  <tr><th className="py-2">Topic</th><th className="py-2 text-right">Questions</th><th className="py-2 text-right">Auto</th><th className="py-2 text-right">Containment</th></tr>
+                </thead>
+                <tbody>
+                  {topicStats.map((t) => (
+                    <tr key={t.category} className="border-b border-border/50">
+                      <td className="py-2 capitalize">{t.category}</td>
+                      <td className="py-2 text-right tabular-nums">{t.total}</td>
+                      <td className="py-2 text-right tabular-nums">{t.auto}</td>
+                      <td className="py-2 text-right tabular-nums">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="inline-block h-1.5 w-16 rounded-full bg-muted overflow-hidden align-middle">
+                            <span className="block h-full bg-primary" style={{ width: `${t.containmentPct}%` }} />
+                          </span>
+                          {t.containmentPct}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Channel mix</CardTitle></CardHeader>
+            <CardContent>
+              {channelRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">No messages in this range.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="text-left text-xs text-muted-foreground border-b border-border">
+                    <tr><th className="py-2">Channel</th><th className="py-2 text-right">Threads</th><th className="py-2 text-right">In</th><th className="py-2 text-right">Out</th></tr>
+                  </thead>
+                  <tbody>
+                    {channelRows.map((c) => (
+                      <tr key={c.channel} className="border-b border-border/50">
+                        <td className="py-2 uppercase text-xs tracking-wide">{c.channel}</td>
+                        <td className="py-2 text-right tabular-nums">{c.conversations}</td>
+                        <td className="py-2 text-right tabular-nums">{c.inbound}</td>
+                        <td className="py-2 text-right tabular-nums">{c.outbound}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-3">Outbound counts drive your Twilio cost — multiply by your per-message rate.</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Trust configuration</CardTitle></CardHeader>
+            <CardContent>
+              {trustConfig.total === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">No per-topic autonomy rules set — all topics follow the property default. Configure them in Settings → AI autonomy.</p>
+              ) : (
+                <div className="flex gap-6">
+                  <div><div className="text-2xl font-semibold">{trustConfig.counts.auto}</div><div className="text-xs text-muted-foreground">auto-send</div></div>
+                  <div><div className="text-2xl font-semibold">{trustConfig.counts.approve}</div><div className="text-xs text-muted-foreground">staff approves</div></div>
+                  <div><div className="text-2xl font-semibold">{trustConfig.counts.suggest}</div><div className="text-xs text-muted-foreground">suggest only</div></div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <Card>
         <CardHeader><CardTitle className="text-base">Replies by day</CardTitle></CardHeader>
