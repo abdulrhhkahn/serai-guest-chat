@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect, useNavigate, Link, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
-import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3 } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
@@ -51,6 +51,16 @@ function AuthedLayout() {
       if (!u.user) return false;
       const { data } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
       return (data ?? []).some((r) => r.role === "admin");
+    },
+  });
+
+  const { data: isOrgAdmin } = useQuery({
+    queryKey: ["is-org-admin"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return false;
+      const { data } = await supabase.from("org_admins").select("org_id").eq("user_id", u.user.id).limit(1);
+      return (data ?? []).length > 0;
     },
   });
 
@@ -161,6 +171,16 @@ function AuthedLayout() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
+                  {isOrgAdmin && (
+                    <SidebarMenuItem key="/organization">
+                      <SidebarMenuButton asChild isActive={pathname === "/organization"}>
+                        <Link to={"/organization" as "/settings"} className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          <span>Organisation</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
