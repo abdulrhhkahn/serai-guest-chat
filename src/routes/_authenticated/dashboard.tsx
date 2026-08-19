@@ -2,10 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, ClipboardList, MessageSquare, Users, Sparkles, AlertTriangle } from "lucide-react";
+import { CalendarDays, ClipboardList, MessageSquare, Users, Sparkles, AlertTriangle, CheckCircle2, Circle } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "@tanstack/react-router";
 import { deliveryAlerts } from "@/lib/delivery-alerts";
+import { buildOnboarding } from "@/lib/onboarding";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -69,6 +70,39 @@ function Dashboard() {
 
   const alerts = deliveryAlerts(deliveryRows ?? []);
 
+  const { data: onboarding } = useQuery({
+    queryKey: ["onboarding-state"],
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) return null;
+      const { data: profile } = await supabase.from("staff_profiles").select("property_id").eq("id", uid).maybeSingle();
+      const pid = profile?.property_id;
+      if (!pid) return null;
+      const [prop, faqs, cats, nums, checkins, audit] = await Promise.all([
+        supabase.from("properties").select("name, checkin_time, checkout_time, wifi_ssid, address, slug").eq("id", pid).maybeSingle(),
+        supabase.from("faqs").select("id", { count: "exact", head: true }).eq("property_id", pid),
+        supabase.from("category_autonomy").select("id", { count: "exact", head: true }).eq("property_id", pid),
+        supabase.from("messaging_numbers").select("id", { count: "exact", head: true }).eq("property_id", pid),
+        supabase.from("checkins").select("id", { count: "exact", head: true }).eq("property_id", pid),
+        supabase.from("autonomy_audit").select("id", { count: "exact", head: true }).eq("property_id", pid),
+      ]);
+      const p = prop.data;
+      return {
+        slug: p?.slug ?? null,
+        state: {
+          detailsComplete: !!(p?.name && p?.checkin_time && p?.checkout_time && (p?.wifi_ssid || p?.address)),
+          faqCount: faqs.count ?? 0,
+          autonomyTouched: (cats.count ?? 0) > 0 || (audit.count ?? 0) > 0,
+          messagingCount: nums.count ?? 0,
+          checkinCount: checkins.count ?? 0,
+        },
+      };
+    },
+  });
+
+  const checklist = onboarding ? buildOnboarding(onboarding.state) : null;
+
   const { data: todaysGuests } = useQuery({
     queryKey: ["todays-guests", today],
     queryFn: async () => {
@@ -110,6 +144,40 @@ function Dashboard() {
             </div>
           ))}
         </div>
+      )}
+
+      {checklist && !checklist.allRequiredDone && (
+        <Card className="border-primary/30">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between text-base">
+              <span>Finish setting up your property</span>
+              <span className="text-sm font-normal text-muted-foreground">{checklist.requiredDone}/{checklist.requiredTotal} done</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {checklist.steps.map((step) => (
+                <li key={step.key} className="flex items-start gap-3">
+                  {step.done
+                    ? <CheckCircle2 className="h-4 w-4 mt-0.5 text-emerald-600 shrink-0" />
+                    : <Circle className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />}
+                  <div className="flex-1">
+                    <div className={`text-sm ${step.done ? "text-muted-foreground line-through" : "font-medium"}`}>
+                      {step.label}
+                      {step.optional && !step.done && <span className="ml-1 text-xs font-normal text-muted-foreground">· optional</span>}
+                    </div>
+                    {!step.done && <div className="text-xs text-muted-foreground">{step.hint}</div>}
+                  </div>
+                  {!step.done && (
+                    step.key === "share" && onboarding?.slug
+                      ? <Link to="/checkin/$slug" params={{ slug: onboarding.slug }} className="text-sm font-medium text-primary underline hover:no-underline shrink-0">View</Link>
+                      : <Link to={step.to as "/settings" | "/knowledge"} className="text-sm font-medium text-primary underline hover:no-underline shrink-0">Set up</Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
