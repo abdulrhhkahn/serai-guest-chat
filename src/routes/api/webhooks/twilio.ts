@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { verifyTwilioSignature, sendTwilioMessage, type Channel } from "@/lib/twilio.server";
+import { verifyTwilioSignature, sendTwilioMessage, statusCallbackUrl, type Channel } from "@/lib/twilio.server";
 import { classifyAndAnswer } from "@/lib/concierge-core.server";
 
 function xml(body = "<Response></Response>") {
@@ -82,10 +82,11 @@ export const Route = createFileRoute("/api/webhooks/twilio")({
           const { answer, category, level } = await classifyAndAnswer({ supabaseAdmin, propertyId, question: body });
 
           if (level === "auto") {
-            const sent = await sendTwilioMessage({ channel, to: from, from: to, body: answer });
+            const sent = await sendTwilioMessage({ channel, to: from, from: to, body: answer, statusCallback: statusCallbackUrl() });
             await supabaseAdmin.from("messages").insert({
               conversation_id: conversationId, sender: "ai", body: answer,
               approved: true, source: "ai_direct", external_id: sent.sid ?? null,
+              delivery_status: sent.ok ? "sent" : "failed", delivery_error: sent.ok ? null : (sent.error ?? "send_failed"),
             });
             await supabaseAdmin.from("conversations")
               .update({ last_message_at: new Date().toISOString(), status: "open" }).eq("id", conversationId);
