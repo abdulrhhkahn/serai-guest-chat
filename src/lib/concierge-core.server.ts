@@ -1,6 +1,5 @@
 import { generateText } from "ai";
-
-type Level = "suggest" | "approve" | "auto";
+import { parseModelAnswer, isUncertain, resolveAutonomyLevel, type Level } from "@/lib/autonomy";
 
 /**
  * Shared classify-and-answer used by both the web concierge and the Twilio
@@ -64,18 +63,13 @@ export async function classifyAndAnswer(opts: {
     prompt: question,
   });
 
-  let answer = text.trim();
-  let category = "other";
-  try {
-    const cleaned = answer.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    const parsed = JSON.parse(cleaned) as { answer?: string; category?: string };
-    if (parsed.answer) answer = parsed.answer.trim();
-    if (parsed.category) category = parsed.category.trim();
-  } catch {
-    /* not JSON — use whole text as answer */
-  }
+  const { answer, category } = parseModelAnswer(text);
 
-  const uncertain = /team member to help/i.test(answer);
-  const level: Level = uncertain ? "approve" : (ruleMap.get(category.toLowerCase()) ?? defaultLevel);
+  const level: Level = resolveAutonomyLevel({
+    category,
+    uncertain: isUncertain(answer),
+    rules: ruleMap,
+    defaultLevel,
+  });
   return { answer, category, level };
 }
