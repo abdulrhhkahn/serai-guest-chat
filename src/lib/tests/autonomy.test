@@ -1,0 +1,70 @@
+import { describe, it, expect } from "vitest";
+import { parseModelAnswer, isUncertain, resolveAutonomyLevel, type Level } from "../autonomy";
+
+describe("parseModelAnswer", () => {
+  it("parses clean minified JSON", () => {
+    expect(parseModelAnswer('{"answer":"Breakfast is 7-10.","category":"Breakfast"}'))
+      .toEqual({ answer: "Breakfast is 7-10.", category: "Breakfast" });
+  });
+
+  it("strips ```json code fences", () => {
+    const raw = '```json\n{"answer":"Wifi is Guest123.","category":"Wifi"}\n```';
+    expect(parseModelAnswer(raw)).toEqual({ answer: "Wifi is Guest123.", category: "Wifi" });
+  });
+
+  it("falls back to whole text + 'other' when not JSON", () => {
+    expect(parseModelAnswer("Sure, checkout is 11am.")).toEqual({
+      answer: "Sure, checkout is 11am.",
+      category: "other",
+    });
+  });
+
+  it("defaults category when only answer is present", () => {
+    expect(parseModelAnswer('{"answer":"Yes."}')).toEqual({ answer: "Yes.", category: "other" });
+  });
+
+  it("ignores non-string fields", () => {
+    expect(parseModelAnswer('{"answer":42,"category":null}').category).toBe("other");
+  });
+
+  it("handles empty input", () => {
+    expect(parseModelAnswer("")).toEqual({ answer: "", category: "other" });
+  });
+});
+
+describe("isUncertain", () => {
+  it("detects the escalation phrase (case-insensitive)", () => {
+    expect(isUncertain("Let me get a team member to help.")).toBe(true);
+    expect(isUncertain("LET ME GET A TEAM MEMBER TO HELP")).toBe(true);
+  });
+  it("is false for a normal answer", () => {
+    expect(isUncertain("Breakfast is included.")).toBe(false);
+  });
+});
+
+describe("resolveAutonomyLevel", () => {
+  const defaultLevel: Level = "auto";
+
+  it("uses a per-category rule when present (case-insensitive)", () => {
+    const rules = new Map<string, Level>([["billing", "approve"]]);
+    expect(resolveAutonomyLevel({ category: "Billing", uncertain: false, rules, defaultLevel }))
+      .toBe("approve");
+  });
+
+  it("falls back to the property default when no rule matches", () => {
+    const rules = new Map<string, Level>([["wifi", "auto"]]);
+    expect(resolveAutonomyLevel({ category: "Parking", uncertain: false, rules, defaultLevel: "suggest" }))
+      .toBe("suggest");
+  });
+
+  it("forces 'approve' when uncertain, ignoring any auto rule", () => {
+    const rules = new Map<string, Level>([["wifi", "auto"]]);
+    expect(resolveAutonomyLevel({ category: "Wifi", uncertain: true, rules, defaultLevel: "auto" }))
+      .toBe("approve");
+  });
+
+  it("accepts a plain object for rules", () => {
+    expect(resolveAutonomyLevel({ category: "Billing", uncertain: false, rules: { billing: "suggest" }, defaultLevel }))
+      .toBe("suggest");
+  });
+});
