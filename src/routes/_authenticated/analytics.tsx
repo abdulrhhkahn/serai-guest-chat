@@ -9,6 +9,7 @@ import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { format, subDays, parseISO, eachDayOfInterval } from "date-fns";
 import { containmentByTopic, overallContainment, channelVolume, containmentByDay } from "@/lib/analytics";
+import { formatChange, graduationDateSet, type AuditEntry } from "@/lib/autonomy-audit";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   component: AnalyticsPage,
@@ -130,6 +131,19 @@ function AnalyticsPage() {
     },
   });
 
+  const { data: autonomyAudit } = useQuery({
+    queryKey: ["analytics-autonomy-audit", range.start, range.end],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("autonomy_audit")
+        .select("property_id, category, old_level, new_level, changed_by, created_at")
+        .gte("created_at", range.start)
+        .lte("created_at", range.end)
+        .order("created_at", { ascending: false });
+      return (data ?? []) as (AuditEntry & { property_id: string; changed_by: string | null })[];
+    },
+  });
+
   const { data: properties } = useQuery({
     queryKey: ["analytics-properties"],
     queryFn: async () => {
@@ -238,6 +252,16 @@ function AnalyticsPage() {
     );
   }, [decisionRows, days]);
   const trendHasData = useMemo(() => containmentTrend.some((d) => d.total > 0), [containmentTrend]);
+
+  // Autonomy config-change audit (property-filtered) + graduation markers.
+  const auditRows = useMemo(
+    () => (autonomyAudit ?? []).filter((a) => propertyId === "all" || a.property_id === propertyId),
+    [autonomyAudit, propertyId],
+  );
+  const graduationDays = useMemo(
+    () => graduationDateSet(auditRows, (iso) => format(parseISO(iso), "yyyy-MM-dd")),
+    [auditRows],
+  );
 
   // Channel mix, filtered by property.
   const channelRows = useMemo(() => {
@@ -599,6 +623,12 @@ function AnalyticsPage() {
                       width={barW} height={(d.total / maxVol) * innerH}
                       className="fill-muted" opacity={0.5} />
                   ))}
+                  {containmentTrend.map((d, i) => graduationDays.has(d.date) ? (
+                    <g key={`g-${d.date}`}>
+                      <line x1={x(i)} x2={x(i)} y1={padT} y2={padT + innerH} stroke="currentColor" className="text-emerald-500" strokeWidth={1} strokeDasharray="3 3" opacity={0.7} />
+                      <text x={x(i)} y={padT - 1} textAnchor="middle" fontSize={8} className="fill-emerald-600">→auto</text>
+                    </g>
+                  ) : null)}
                   <polyline points={linePts} fill="none" stroke="currentColor" className="text-primary" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
                   {containmentTrend.map((d, i) => d.total > 0 ? (
                     <circle key={d.date} cx={x(i)} cy={y(d.pct)} r={2.5} className="fill-primary" />
@@ -615,6 +645,32 @@ function AnalyticsPage() {
               </div>
             );
           })()}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Autonomy changes</CardTitle></CardHeader>
+        <CardContent>
+          {auditRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No autonomy config changes in this range. Adjust levels in Settings → AI autonomy and they'll be logged here.</p>
+          ) : (
+            <ul className="divide-y divide-border text-sm">
+              {auditRows.slice(0, 30).map((e, i) => {
+                const grad = e.new_level === "auto" && e.old_level !== "auto";
+                return (
+                  <li key={i} className="py-2 flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2">
+                      {grad && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                      <span>{formatChange(e)}</span>
+                    </span>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {e.changed_by ? (staffName.get(e.changed_by) ?? "Staff") : "System"} · {format(parseISO(e.created_at), "MMM d")}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </CardContent>
       </Card>
 
