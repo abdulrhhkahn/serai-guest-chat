@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { format, subDays, parseISO, eachDayOfInterval } from "date-fns";
 import { containmentByTopic, overallContainment, channelVolume, containmentByDay } from "@/lib/analytics";
 import { formatChange, graduationDateSet, type AuditEntry } from "@/lib/autonomy-audit";
+import { csatSummary } from "@/lib/csat";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   component: AnalyticsPage,
@@ -130,6 +131,24 @@ function AnalyticsPage() {
       return data ?? [];
     },
   });
+
+  const { data: csatRows } = useQuery({
+    queryKey: ["analytics-csat", range.start, range.end],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("conversations")
+        .select("property_id, csat_rating, csat_at")
+        .not("csat_rating", "is", null)
+        .gte("csat_at", range.start)
+        .lte("csat_at", range.end);
+      return (data ?? []) as { property_id: string; csat_rating: number | null }[];
+    },
+  });
+
+  const csat = useMemo(() => {
+    const rows = (csatRows ?? []).filter((r) => propertyId === "all" || r.property_id === propertyId);
+    return csatSummary(rows.map((r) => r.csat_rating));
+  }, [csatRows, propertyId]);
 
   const { data: autonomyAudit } = useQuery({
     queryKey: ["analytics-autonomy-audit", range.start, range.end],
@@ -584,6 +603,37 @@ function AnalyticsPage() {
                   <div><div className="text-2xl font-semibold">{trustConfig.counts.auto}</div><div className="text-xs text-muted-foreground">auto-send</div></div>
                   <div><div className="text-2xl font-semibold">{trustConfig.counts.approve}</div><div className="text-xs text-muted-foreground">staff approves</div></div>
                   <div><div className="text-2xl font-semibold">{trustConfig.counts.suggest}</div><div className="text-xs text-muted-foreground">suggest only</div></div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Guest satisfaction</CardTitle></CardHeader>
+            <CardContent>
+              {csat.count === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">No ratings yet. Guests are asked to rate once a conversation is resolved.</p>
+              ) : (
+                <div>
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <span className="text-3xl font-semibold">{csat.average.toFixed(1)}</span>
+                    <span className="text-sm text-muted-foreground">/ 5 · {csat.positivePct}% positive ({csat.count} rating{csat.count === 1 ? "" : "s"})</span>
+                  </div>
+                  <div className="space-y-1">
+                    {[5, 4, 3, 2, 1].map((star) => {
+                      const c = csat.distribution[star - 1];
+                      const pct = csat.count ? Math.round((c / csat.count) * 100) : 0;
+                      return (
+                        <div key={star} className="flex items-center gap-2 text-xs">
+                          <span className="w-6 text-muted-foreground">{star}★</span>
+                          <span className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <span className="block h-full bg-primary" style={{ width: `${pct}%` }} />
+                          </span>
+                          <span className="w-8 text-right tabular-nums text-muted-foreground">{c}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </CardContent>
