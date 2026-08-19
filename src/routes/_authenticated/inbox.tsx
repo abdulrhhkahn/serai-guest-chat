@@ -29,6 +29,8 @@ type Conversation = {
   needs_staff: boolean | null;
   resolved_at: string | null;
   checkin_id: string | null;
+  channel: string | null;
+  csat_rating: number | null;
 };
 
 
@@ -293,6 +295,21 @@ function InboxPage() {
     ).eq("id", conversationId);
     if (error) return toast.error(error.message);
     await logEvent(conversationId, done ? "resolved" : "reopened");
+    // For SMS/WhatsApp conversations, invite a rating by text (web guests get the
+    // in-app star prompt instead). dispatch no-ops for web conversations.
+    if (done) {
+      const conv = conversations?.find((c) => c.id === conversationId);
+      if (conv && conv.channel && conv.channel !== "web" && !conv.csat_rating) {
+        try {
+          const { data: s } = await supabase.auth.getSession();
+          await fetch("/api/outbound/dispatch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
+            body: JSON.stringify({ conversationId, body: "Thanks for staying with us! How did we do? Reply 1-5 (5 = great)." }),
+          });
+        } catch { /* best-effort */ }
+      }
+    }
     toast.success(done ? "Marked resolved — guest notified" : "Conversation reopened");
     qc.invalidateQueries({ queryKey: ["conversations"] });
     qc.invalidateQueries({ queryKey: ["open-last-guest"] });

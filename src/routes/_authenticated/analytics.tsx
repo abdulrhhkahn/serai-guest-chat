@@ -11,6 +11,8 @@ import { format, subDays, parseISO, eachDayOfInterval } from "date-fns";
 import { containmentByTopic, overallContainment, channelVolume, containmentByDay } from "@/lib/analytics";
 import { formatChange, graduationDateSet, type AuditEntry } from "@/lib/autonomy-audit";
 import { csatSummary } from "@/lib/csat";
+import { propertyRollup } from "@/lib/rollup";
+import { summaryCsvRows } from "@/lib/report-csv";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   component: AnalyticsPage,
@@ -23,6 +25,7 @@ type MsgRow = {
   source: string | null;
   sender_user_id: string | null;
   created_at: string;
+  delivery_status: string | null;
 };
 
 type ConvRow = {
@@ -94,7 +97,7 @@ function AnalyticsPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("messages")
-        .select("id, conversation_id, sender, source, sender_user_id, created_at")
+        .select("id, conversation_id, sender, source, sender_user_id, created_at, delivery_status")
         .gte("created_at", range.start)
         .lte("created_at", range.end)
         .order("created_at");
@@ -190,6 +193,29 @@ function AnalyticsPage() {
     for (const c of convs ?? []) m.set(c.id, c);
     return m;
   }, [convs]);
+
+  // Multi-property rollup: per-property comparison across everything the user can
+  // see. Only meaningful (and only shown) when the data spans >1 property.
+  const rollup = useMemo(() => {
+    const failuresByProperty = new Map<string, number>();
+    for (const m of allRows ?? []) {
+      if (m.delivery_status === "failed" || m.delivery_status === "undelivered") {
+        const pid = convById.get(m.conversation_id)?.property_id;
+        if (pid) failuresByProperty.set(pid, (failuresByProperty.get(pid) ?? 0) + 1);
+      }
+    }
+    const propsWithData = new Set<string>([
+      ...(decisions ?? []).map((d) => d.property_id),
+      ...(csatRows ?? []).map((c) => c.property_id),
+    ]);
+    const props = (properties ?? []).filter((p) => propsWithData.has(p.id));
+    return propertyRollup({
+      properties: props,
+      decisions: (decisions ?? []).map((d) => ({ property_id: d.property_id, outcome: d.outcome })),
+      csat: (csatRows ?? []).map((c) => ({ property_id: c.property_id, csat_rating: c.csat_rating })),
+      failuresByProperty,
+    });
+  }, [properties, decisions, csatRows, allRows, convById]);
 
   // property options limited to properties that actually have conversation data visible
   const propertyOptions = useMemo(() => {
@@ -395,6 +421,19 @@ function AnalyticsPage() {
     downloadCsv(`serai-wait-times-${from}_${to}.csv`, rows);
   }
 
+  function exportSummary() {
+    const rows = summaryCsvRows({
+      rangeLabel: `${from} to ${to}`,
+      containmentPct: containment,
+      totalQuestions: decisionRows.length,
+      csatAvg: csat.average,
+      csatCount: csat.count,
+      topics: topicStats.map((t) => ({ category: t.category, total: t.total, containmentPct: t.containmentPct })),
+      channels: channelRows.map((c) => ({ channel: c.channel, inbound: c.inbound, outbound: c.outbound })),
+    });
+    downloadCsv(`serai-summary-${from}_${to}.csv`, rows);
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-6xl">
       <div className="flex flex-wrap items-end gap-3">
@@ -430,8 +469,11 @@ function AnalyticsPage() {
             <button onClick={() => preset(14)} className="text-xs px-2 py-1 rounded border border-border hover:bg-accent">14d</button>
             <button onClick={() => preset(30)} className="text-xs px-2 py-1 rounded border border-border hover:bg-accent">30d</button>
           </div>
+          <Button variant="outline" size="sm" className="h-9" onClick={exportSummary}>
+            <Download className="h-3.5 w-3.5 mr-1.5" /> Download summary
+          </Button>
           <Button variant="outline" size="sm" className="h-9" onClick={exportCsv} disabled={!waitMetrics.perProperty.length}>
-            <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+            <Download className="h-3.5 w-3.5 mr-1.5" /> Wait times
           </Button>
         </div>
       </div>
@@ -450,6 +492,36 @@ function AnalyticsPage() {
           <div className="text-3xl font-serif mt-1">{totals.staff}</div>
         </CardContent></Card>
       </div>
+
+      {rollup.length > 1 && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">By property</CardTitle></CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs text-muted-foreground border-b border-border">
+                <tr>
+                  <th className="py-2">Property</th>
+                  <th className="py-2 text-right">Questions</th>
+                  <th className="py-2 text-right">Containment</th>
+                  <th className="py-2 text-right">CSAT</th>
+                  <th className="py-2 text-right">Failures</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rollup.map((r) => (
+                  <tr key={r.id} className="border-b border-border/50">
+                    <td className="py-2">{r.name}</td>
+                    <td className="py-2 text-right tabular-nums">{r.questions}</td>
+                    <td className="py-2 text-right tabular-nums">{r.containmentPct}%</td>
+                    <td className="py-2 text-right tabular-nums">{r.csatCount ? `${r.csatAvg} (${r.csatCount})` : "—"}</td>
+                    <td className={`py-2 text-right tabular-nums ${r.failures ? "text-red-600" : ""}`}>{r.failures || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-4">
         <Card><CardContent className="pt-6">
