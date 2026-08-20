@@ -115,6 +115,41 @@ function Dashboard() {
     },
   });
 
+  // Reuses the same "current-property" cache key as route.tsx/analytics.tsx.
+  const { data: myProperty } = useQuery({
+    queryKey: ["current-property"],
+    queryFn: async () => {
+      const { data: prof } = await supabase.from("staff_profiles").select("property_id, full_name").maybeSingle();
+      if (!prof?.property_id) return null;
+      const { data: p } = await supabase.from("properties").select("*").eq("id", prof.property_id).maybeSingle();
+      return p;
+    },
+  });
+
+  // Starter's 50-conversations/month usage. Only meaningful (and only
+  // fetched) for properties actually on Starter — Growth+ is unlimited.
+  const { data: conversationUsage } = useQuery({
+    queryKey: ["conversation-usage", myProperty?.id],
+    enabled: !!myProperty?.id,
+    queryFn: async () => {
+      const { data: growthOk } = await supabase.rpc("property_has_plan_at_least", {
+        _property_id: myProperty!.id,
+        min_tier: "growth",
+      });
+      if (growthOk) return null; // unlimited, nothing to show
+
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const { count } = await supabase
+        .from("conversations")
+        .select("id", { count: "exact", head: true })
+        .eq("property_id", myProperty!.id)
+        .gte("created_at", monthStart.toISOString());
+      return { used: count ?? 0, limit: 50 };
+    },
+  });
+
   return (
     <div className="p-6 space-y-6 max-w-6xl">
       <div>
@@ -178,6 +213,34 @@ function Dashboard() {
             </ul>
           </CardContent>
         </Card>
+      )}
+
+      {conversationUsage && conversationUsage.used >= 40 && (
+        <div
+          className={`flex items-start gap-3 rounded-lg border p-3 ${
+            conversationUsage.used >= conversationUsage.limit
+              ? "border-red-300 bg-red-50 text-red-900"
+              : "border-amber-300 bg-amber-50 text-amber-900"
+          }`}
+        >
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div className="flex-1 text-sm">
+            <div className="font-medium">
+              {conversationUsage.used >= conversationUsage.limit
+                ? "Starter plan limit reached"
+                : "Approaching your Starter plan limit"}
+            </div>
+            <div className="opacity-80">
+              {conversationUsage.used}/{conversationUsage.limit} conversations this month.
+              {conversationUsage.used >= conversationUsage.limit
+                ? " New conversations are blocked until next month or you upgrade."
+                : " Upgrade to Growth for unlimited conversations."}
+            </div>
+          </div>
+          <Link to="/billing" className="text-sm font-medium underline hover:no-underline shrink-0">
+            Upgrade
+          </Link>
+        </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
