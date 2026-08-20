@@ -28,10 +28,22 @@ export const Route = createFileRoute("/api/admin/weekly-digest")({
         const prevStart = new Date(now - 2 * weekMs).toISOString();
         const rangeLabel = `${new Date(now - weekMs).toLocaleDateString()} – ${new Date(now).toLocaleDateString()}`;
 
-        const { data: props } = await supabaseAdmin
+        const { data: allProps } = await supabaseAdmin
           .from("properties")
           .select("id, name, report_email")
           .not("report_email", "is", null);
+
+        // Weekly digest is a Growth+ feature (PLAN_FEATURES.weeklyDigest in
+        // src/lib/billing.ts). Filter out Starter properties before doing
+        // any of the expensive per-property aggregation below.
+        const props: typeof allProps = [];
+        for (const p of allProps ?? []) {
+          const { data: planOk } = await supabaseAdmin.rpc("property_has_plan_at_least", {
+            _property_id: p.id,
+            min_tier: "growth",
+          });
+          if (planOk) props.push(p);
+        }
 
         const results: { property: string; sent: boolean; recipients?: number; error?: string; dryRun?: boolean }[] = [];
 
