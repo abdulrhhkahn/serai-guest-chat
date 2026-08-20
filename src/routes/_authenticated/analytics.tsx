@@ -83,6 +83,32 @@ function downloadCsv(filename: string, rows: (string | number)[][]) {
 }
 
 function AnalyticsPage() {
+  // Analytics as a whole is a Growth+ feature (PLAN_FEATURES.analytics in
+  // src/lib/billing.ts). Reuses the same "current-property" query key as
+  // the authenticated layout (route.tsx) so this shares its cache instead
+  // of firing a duplicate request.
+  const { data: myProperty } = useQuery({
+    queryKey: ["current-property"],
+    queryFn: async () => {
+      const { data: prof } = await supabase.from("staff_profiles").select("property_id, full_name").maybeSingle();
+      if (!prof?.property_id) return null;
+      const { data: p } = await supabase.from("properties").select("*").eq("id", prof.property_id).maybeSingle();
+      return p;
+    },
+  });
+
+  const { data: analyticsPlanOk, isLoading: planLoading } = useQuery({
+    queryKey: ["analytics-plan-ok", myProperty?.id],
+    enabled: !!myProperty?.id,
+    queryFn: async () => {
+      const { data } = await supabase.rpc("property_has_plan_at_least", {
+        _property_id: myProperty!.id,
+        min_tier: "growth",
+      });
+      return !!data;
+    },
+  });
+
   const [from, setFrom] = useState(format(subDays(new Date(), 14), "yyyy-MM-dd"));
   const [to, setTo] = useState(format(new Date(), "yyyy-MM-dd"));
   const [propertyId, setPropertyId] = useState<string>("all");
@@ -171,6 +197,22 @@ function AnalyticsPage() {
     queryFn: async () => {
       const { data } = await supabase.from("properties").select("id, name").order("name");
       return data ?? [];
+    },
+  });
+
+  // Multi-property rollup is a Pro-tier feature (orgRollup in
+  // src/lib/billing.ts). All properties an org admin can see share one
+  // organization, so checking against the first is equivalent to checking
+  // the org itself.
+  const { data: rollupPlanOk } = useQuery({
+    queryKey: ["rollup-plan-ok", properties?.[0]?.id],
+    enabled: !!properties?.[0]?.id,
+    queryFn: async () => {
+      const { data } = await supabase.rpc("property_has_plan_at_least", {
+        _property_id: properties![0].id,
+        min_tier: "pro",
+      });
+      return !!data;
     },
   });
 
@@ -434,6 +476,25 @@ function AnalyticsPage() {
     downloadCsv(`serai-summary-${from}_${to}.csv`, rows);
   }
 
+  // Gate the whole page behind Growth+ once we know (loading state shows
+  // nothing rather than flashing the paywall for properties that DO have
+  // access). A property with no org falls back to Starter and is blocked.
+  if (myProperty?.id && !planLoading && !analyticsPlanOk) {
+    return (
+      <div className="p-6 max-w-2xl">
+        <h1 className="font-serif text-3xl mb-2">Analytics</h1>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">
+              Analytics is available on the Growth plan and above.{" "}
+              <a href="/billing" className="underline">Upgrade to unlock reply mix, containment, wait times and more</a>.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-6xl">
       <div className="flex flex-wrap items-end gap-3">
@@ -494,33 +555,44 @@ function AnalyticsPage() {
       </div>
 
       {rollup.length > 1 && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">By property</CardTitle></CardHeader>
-          <CardContent>
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-muted-foreground border-b border-border">
-                <tr>
-                  <th className="py-2">Property</th>
-                  <th className="py-2 text-right">Questions</th>
-                  <th className="py-2 text-right">Containment</th>
-                  <th className="py-2 text-right">CSAT</th>
-                  <th className="py-2 text-right">Failures</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rollup.map((r) => (
-                  <tr key={r.id} className="border-b border-border/50">
-                    <td className="py-2">{r.name}</td>
-                    <td className="py-2 text-right tabular-nums">{r.questions}</td>
-                    <td className="py-2 text-right tabular-nums">{r.containmentPct}%</td>
-                    <td className="py-2 text-right tabular-nums">{r.csatCount ? `${r.csatAvg} (${r.csatCount})` : "—"}</td>
-                    <td className={`py-2 text-right tabular-nums ${r.failures ? "text-red-600" : ""}`}>{r.failures || "—"}</td>
+        rollupPlanOk ? (
+          <Card>
+            <CardHeader><CardTitle className="text-base">By property</CardTitle></CardHeader>
+            <CardContent>
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs text-muted-foreground border-b border-border">
+                  <tr>
+                    <th className="py-2">Property</th>
+                    <th className="py-2 text-right">Questions</th>
+                    <th className="py-2 text-right">Containment</th>
+                    <th className="py-2 text-right">CSAT</th>
+                    <th className="py-2 text-right">Failures</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+                </thead>
+                <tbody>
+                  {rollup.map((r) => (
+                    <tr key={r.id} className="border-b border-border/50">
+                      <td className="py-2">{r.name}</td>
+                      <td className="py-2 text-right tabular-nums">{r.questions}</td>
+                      <td className="py-2 text-right tabular-nums">{r.containmentPct}%</td>
+                      <td className="py-2 text-right tabular-nums">{r.csatCount ? `${r.csatAvg} (${r.csatCount})` : "—"}</td>
+                      <td className={`py-2 text-right tabular-nums ${r.failures ? "text-red-600" : ""}`}>{r.failures || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">
+                Cross-property comparison is available on the Pro plan.{" "}
+                <a href="/billing" className="underline">Upgrade to enable this</a>.
+              </p>
+            </CardContent>
+          </Card>
+        )
       )}
 
       <div className="grid gap-4 sm:grid-cols-4">
