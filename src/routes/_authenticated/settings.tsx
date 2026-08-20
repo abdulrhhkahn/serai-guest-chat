@@ -168,8 +168,32 @@ const LEVELS: [string, string][] = [
   ["auto", "Auto-send"],
 ];
 
+// Mirrors autonomy_level_allowed() in the DB — used to grey out options
+// before a save attempt, not as the actual enforcement (the DB trigger is).
+function usePlanTier(propertyId: string) {
+  return useQuery({
+    queryKey: ["plan-tier", propertyId],
+    queryFn: async () => {
+      const [{ data: growthOk }, { data: proOk }] = await Promise.all([
+        supabase.rpc("property_has_plan_at_least", { _property_id: propertyId, min_tier: "growth" }),
+        supabase.rpc("property_has_plan_at_least", { _property_id: propertyId, min_tier: "pro" }),
+      ]);
+      return { growthOk: !!growthOk, proOk: !!proOk };
+    },
+  });
+}
+
+function levelAllowed(level: string, plan?: { growthOk: boolean; proOk: boolean }) {
+  if (!plan) return true; // don't block the UI while loading
+  if (level === "suggest") return true;
+  if (level === "approve") return plan.growthOk;
+  if (level === "auto") return plan.proOk;
+  return true;
+}
+
 function AutonomyCard({ propertyId }: { propertyId: string }) {
   const qc = useQueryClient();
+  const { data: plan } = usePlanTier(propertyId);
   const { data } = useQuery({
     queryKey: ["autonomy", propertyId],
     queryFn: async () => {
@@ -216,7 +240,11 @@ function AutonomyCard({ propertyId }: { propertyId: string }) {
       <div>
         <Label>Default</Label>
         <select value={def} onChange={(e) => setDef(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm">
-          {LEVELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {LEVELS.map(([v, l]) => (
+            <option key={v} value={v} disabled={!levelAllowed(v, plan)}>
+              {l}{!levelAllowed(v, plan) ? " (upgrade required)" : ""}
+            </option>
+          ))}
         </select>
       </div>
       {(data?.cats.length ?? 0) > 0 && (
@@ -230,7 +258,11 @@ function AutonomyCard({ propertyId }: { propertyId: string }) {
                 onChange={(e) => setRules((prev) => ({ ...prev, [cat]: e.target.value }))}
                 className="h-9 w-40 rounded-md border border-border bg-background px-2 text-sm"
               >
-                {LEVELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                {LEVELS.map(([v, l]) => (
+                  <option key={v} value={v} disabled={!levelAllowed(v, plan)}>
+                    {l}{!levelAllowed(v, plan) ? " (upgrade)" : ""}
+                  </option>
+                ))}
               </select>
             </div>
           ))}
@@ -245,6 +277,7 @@ function AutonomyCard({ propertyId }: { propertyId: string }) {
 
 function MessagingNumbersCard({ propertyId }: { propertyId: string }) {
   const qc = useQueryClient();
+  const { data: plan } = usePlanTier(propertyId);
   const { data: numbers } = useQuery({
     queryKey: ["messaging-numbers", propertyId],
     queryFn: async () => {
@@ -277,6 +310,18 @@ function MessagingNumbersCard({ propertyId }: { propertyId: string }) {
     const { error } = await supabase.from("messaging_numbers").delete().eq("id", id);
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["messaging-numbers", propertyId] });
+  }
+
+  if (plan && !plan.growthOk) {
+    return (
+      <Card className="p-5 space-y-2">
+        <h2 className="font-medium">Messaging numbers</h2>
+        <p className="text-sm text-muted-foreground">
+          SMS and WhatsApp are available on the Growth plan and above.{" "}
+          <a href="/billing" className="underline">Upgrade to enable this</a>.
+        </p>
+      </Card>
+    );
   }
 
   return (
