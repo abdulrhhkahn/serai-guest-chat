@@ -45,6 +45,19 @@ export const Route = createFileRoute("/api/outbound/dispatch")({
 
         const channel = conv.channel as Channel;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        // Explicit plan check, not just relying on messaging_numbers being
+        // absent — a downgraded org keeps its old number row (nothing
+        // deletes it automatically), so without this an SMS/WhatsApp org
+        // that drops to Starter would keep sending on a stale number.
+        const { data: planOk } = await supabaseAdmin.rpc("property_has_plan_at_least", {
+          _property_id: conv.property_id,
+          min_tier: "growth",
+        });
+        if (!planOk) {
+          return Response.json({ ok: false, error: "SMS/WhatsApp requires the Growth plan or above" });
+        }
+
         const { data: num } = await supabaseAdmin
           .from("messaging_numbers")
           .select("phone_number")
