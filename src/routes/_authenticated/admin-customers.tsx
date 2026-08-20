@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
 
-export const Route = createFileRoute("/_authenticated/admin-customers")({
+export const Route = createFileRoute("/_platform-admin/admin-customers")({
   component: CustomersAdminPage,
 });
 
@@ -35,19 +35,8 @@ async function callAdmin(body: Record<string, unknown>) {
 function CustomersAdminPage() {
   const qc = useQueryClient();
 
-  const { data: isPlatformAdmin, isLoading: checkingAdmin } = useQuery({
-    queryKey: ["is-admin"],
-    queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return false;
-      const { data } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
-      return (data ?? []).some((r) => r.role === "admin");
-    },
-  });
-
   const { data: unassigned } = useQuery({
     queryKey: ["unassigned-properties"],
-    enabled: !!isPlatformAdmin,
     queryFn: async () => {
       const { data } = await supabase.from("properties").select("id, name").is("organization_id", null).order("name");
       return data ?? [];
@@ -56,7 +45,6 @@ function CustomersAdminPage() {
 
   const { data: orgs, refetch: refetchOrgs } = useQuery({
     queryKey: ["all-orgs-with-subs"],
-    enabled: !!isPlatformAdmin,
     queryFn: async (): Promise<Org[]> => {
       const { data: orgRows } = await supabase.from("organizations").select("id, name").order("name");
       const { data: propRows } = await supabase.from("properties").select("id, name, organization_id").not("organization_id", "is", null);
@@ -82,15 +70,6 @@ function CustomersAdminPage() {
   function refreshAll() {
     qc.invalidateQueries({ queryKey: ["unassigned-properties"] });
     refetchOrgs();
-  }
-
-  if (checkingAdmin) return null;
-  if (!isPlatformAdmin) {
-    return (
-      <div className="p-6 max-w-xl">
-        <p className="text-sm text-muted-foreground">You don't have access to this page.</p>
-      </div>
-    );
   }
 
   return (
