@@ -13,6 +13,17 @@ export const Route = createFileRoute("/_authenticated/billing")({
   component: BillingPage,
 });
 
+// TODO: replace with your real sales contact.
+const SALES_EMAIL = "sales@serai.app";
+const salesMailto = (tier: string) =>
+  `mailto:${SALES_EMAIL}?subject=${encodeURIComponent(`Serai ${tier} plan — question before subscribing`)}`;
+
+const AUTONOMY_COPY: Record<string, string> = {
+  suggest: "AI suggests replies, staff sends every message",
+  approve_all: "AI drafts replies, staff approves before sending",
+  auto: "AI auto-sends on trusted topics, staff handles the rest",
+};
+
 async function startCheckout(orgId: string, tier: PlanTier) {
   const { data: s } = await supabase.auth.getSession();
   const res = await fetch("/api/billing/checkout", {
@@ -89,7 +100,7 @@ function BillingPage() {
         {isActive ? `Current plan: ${PLAN_PRICING_PKR[currentTier as PlanTier]?.label ?? "Starter"}` : "You're on the free Starter plan."}
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3 items-start">
         <PlanCard tier="starter" isCurrent={!isActive} />
         {(["growth", "pro"] as PlanTier[]).map((tier) => (
           <PlanCard
@@ -118,28 +129,57 @@ function PlanCard({
 }) {
   const features = PLAN_FEATURES[tier];
   const pricing = tier === "starter" ? null : PLAN_PRICING_PKR[tier];
+  const label = pricing?.label ?? "Starter";
 
   return (
     <Card className={isCurrent ? "border-primary" : undefined}>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>{pricing?.label ?? "Starter"}</CardTitle>
+          <CardTitle>{label}</CardTitle>
           {isCurrent && <Badge>Current</Badge>}
         </div>
         <p className="text-2xl font-semibold">
           {pricing ? `PKR ${pricing.monthlyPkr.toLocaleString()}/mo` : "Free"}
         </p>
+        {pricing && <p className="text-xs text-muted-foreground">per property, billed monthly</p>}
       </CardHeader>
       <CardContent className="space-y-4">
-        <ul className="text-sm space-y-1 text-muted-foreground">
-          <li>Channels: {features.channels.join(", ")}</li>
-          <li>AI autonomy: {features.aiAutonomy}</li>
-          <li>Conversations/mo: {features.maxConversationsPerMonth ?? "Unlimited"}</li>
+        <ul className="text-sm space-y-2.5 text-muted-foreground">
+          <li>
+            <span className="font-medium text-foreground">Channels — </span>
+            {features.channels.map((c) => (c === "web" ? "Web chat" : c === "sms" ? "SMS" : "WhatsApp")).join(", ")}
+          </li>
+          <li>
+            <span className="font-medium text-foreground">AI behaviour — </span>
+            {AUTONOMY_COPY[features.aiAutonomy]}
+          </li>
+          <li>
+            <span className="font-medium text-foreground">Conversations/month — </span>
+            {features.maxConversationsPerMonth ?? "Unlimited"}
+          </li>
+          <li>
+            <span className="font-medium text-foreground">Analytics — </span>
+            {features.analytics ? "Reply mix, containment, wait times, CSAT" : "Not included"}
+          </li>
+          <li>
+            <span className="font-medium text-foreground">Weekly email digest — </span>
+            {features.weeklyDigest ? "Included" : "Not included"}
+          </li>
+          <li>
+            <span className="font-medium text-foreground">Multi-property — </span>
+            {features.orgRollup ? "Add properties, cross-property comparison" : "Single property"}
+          </li>
         </ul>
+
         {onSubscribe && !isCurrent && (
-          <Button className="w-full" onClick={onSubscribe} disabled={redirecting}>
-            {redirecting ? "Redirecting…" : "Subscribe"}
-          </Button>
+          <div className="space-y-2">
+            <Button className="w-full" onClick={onSubscribe} disabled={redirecting}>
+              {redirecting ? "Redirecting…" : "Subscribe"}
+            </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              or <a href={salesMailto(label)} className="underline">contact sales</a>
+            </p>
+          </div>
         )}
       </CardContent>
     </Card>
