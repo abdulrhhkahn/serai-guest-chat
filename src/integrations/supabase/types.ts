@@ -7,26 +7,214 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
+      ai_decisions: {
+        Row: {
+          category: string | null
+          channel: string
+          conversation_id: string | null
+          created_at: string
+          id: string
+          level: string
+          outcome: string
+          property_id: string
+        }
+        Insert: {
+          category?: string | null
+          channel?: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          level: string
+          outcome: string
+          property_id: string
+        }
+        Update: {
+          category?: string | null
+          channel?: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          level?: string
+          outcome?: string
+          property_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_decisions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_decisions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_drafts: {
+        Row: {
+          category: string | null
+          conversation_id: string
+          created_at: string
+          draft: string
+          id: string
+          property_id: string
+        }
+        Insert: {
+          category?: string | null
+          conversation_id: string
+          created_at?: string
+          draft: string
+          id?: string
+          property_id: string
+        }
+        Update: {
+          category?: string | null
+          conversation_id?: string
+          created_at?: string
+          draft?: string
+          id?: string
+          property_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_drafts_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_drafts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autonomy_audit: {
+        Row: {
+          category: string | null
+          changed_by: string | null
+          created_at: string
+          id: string
+          new_level: string
+          old_level: string | null
+          property_id: string
+        }
+        Insert: {
+          category?: string | null
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_level: string
+          old_level?: string | null
+          property_id: string
+        }
+        Update: {
+          category?: string | null
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_level?: string
+          old_level?: string | null
+          property_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autonomy_audit_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          processed_at: string | null
+          safepay_event_token: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          safepay_event_token: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          safepay_event_token?: string
+        }
+        Relationships: []
+      }
+      category_autonomy: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          level: string
+          property_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          level: string
+          property_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          level?: string
+          property_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_autonomy_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checkins: {
         Row: {
           arrival_date: string | null
           booking_reference: string | null
           created_at: string
           departure_date: string | null
+          documents_purged_at: string | null
           guest_email: string | null
           guest_name: string
           guest_phone: string | null
+          guest_user_id: string | null
           id: string
           id_document_url: string | null
           num_guests: number | null
           property_id: string
+          room: string | null
           signature_url: string | null
           status: string
         }
@@ -35,13 +223,16 @@ export type Database = {
           booking_reference?: string | null
           created_at?: string
           departure_date?: string | null
+          documents_purged_at?: string | null
           guest_email?: string | null
           guest_name: string
           guest_phone?: string | null
+          guest_user_id?: string | null
           id?: string
           id_document_url?: string | null
           num_guests?: number | null
           property_id: string
+          room?: string | null
           signature_url?: string | null
           status?: string
         }
@@ -50,13 +241,16 @@ export type Database = {
           booking_reference?: string | null
           created_at?: string
           departure_date?: string | null
+          documents_purged_at?: string | null
           guest_email?: string | null
           guest_name?: string
           guest_phone?: string | null
+          guest_user_id?: string | null
           id?: string
           id_document_url?: string | null
           num_guests?: number | null
           property_id?: string
+          room?: string | null
           signature_url?: string | null
           status?: string
         }
@@ -108,9 +302,13 @@ export type Database = {
       conversations: {
         Row: {
           channel: string
+          checkin_id: string | null
           created_at: string
+          csat_at: string | null
+          csat_rating: number | null
           guest_contact: string | null
           guest_name: string | null
+          guest_user_id: string | null
           id: string
           last_message_at: string | null
           needs_staff: boolean
@@ -121,9 +319,13 @@ export type Database = {
         }
         Insert: {
           channel?: string
+          checkin_id?: string | null
           created_at?: string
+          csat_at?: string | null
+          csat_rating?: number | null
           guest_contact?: string | null
           guest_name?: string | null
+          guest_user_id?: string | null
           id?: string
           last_message_at?: string | null
           needs_staff?: boolean
@@ -134,9 +336,13 @@ export type Database = {
         }
         Update: {
           channel?: string
+          checkin_id?: string | null
           created_at?: string
+          csat_at?: string | null
+          csat_rating?: number | null
           guest_contact?: string | null
           guest_name?: string | null
+          guest_user_id?: string | null
           id?: string
           last_message_at?: string | null
           needs_staff?: boolean
@@ -146,6 +352,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_checkin_id_fkey"
+            columns: ["checkin_id"]
+            isOneToOne: false
+            referencedRelation: "checkins"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversations_property_id_fkey"
             columns: ["property_id"]
@@ -197,6 +410,9 @@ export type Database = {
           client_msg_id: string | null
           conversation_id: string
           created_at: string
+          delivery_error: string | null
+          delivery_status: string | null
+          external_id: string | null
           id: string
           is_ai_suggestion: boolean
           original_draft: string | null
@@ -210,6 +426,9 @@ export type Database = {
           client_msg_id?: string | null
           conversation_id: string
           created_at?: string
+          delivery_error?: string | null
+          delivery_status?: string | null
+          external_id?: string | null
           id?: string
           is_ai_suggestion?: boolean
           original_draft?: string | null
@@ -223,6 +442,9 @@ export type Database = {
           client_msg_id?: string | null
           conversation_id?: string
           created_at?: string
+          delivery_error?: string | null
+          delivery_status?: string | null
+          external_id?: string | null
           id?: string
           is_ai_suggestion?: boolean
           original_draft?: string | null
@@ -240,6 +462,82 @@ export type Database = {
           },
         ]
       }
+      messaging_numbers: {
+        Row: {
+          channel: string
+          created_at: string
+          id: string
+          phone_number: string
+          property_id: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          id?: string
+          phone_number: string
+          property_id: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          id?: string
+          phone_number?: string
+          property_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messaging_numbers_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_admins: {
+        Row: {
+          created_at: string
+          org_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          org_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          org_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_admins_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       properties: {
         Row: {
           address: string | null
@@ -247,9 +545,12 @@ export type Database = {
           checkin_time: string | null
           checkout_time: string | null
           created_at: string
+          default_autonomy: string
           id: string
           logo_url: string | null
           name: string
+          organization_id: string | null
+          report_email: string | null
           slug: string
           welcome_message: string | null
           wifi_password: string | null
@@ -261,9 +562,12 @@ export type Database = {
           checkin_time?: string | null
           checkout_time?: string | null
           created_at?: string
+          default_autonomy?: string
           id?: string
           logo_url?: string | null
           name: string
+          organization_id?: string | null
+          report_email?: string | null
           slug: string
           welcome_message?: string | null
           wifi_password?: string | null
@@ -275,13 +579,45 @@ export type Database = {
           checkin_time?: string | null
           checkout_time?: string | null
           created_at?: string
+          default_autonomy?: string
           id?: string
           logo_url?: string | null
           name?: string
+          organization_id?: string | null
+          report_email?: string | null
           slug?: string
           welcome_message?: string | null
           wifi_password?: string | null
           wifi_ssid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "properties_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rate_limits: {
+        Row: {
+          bucket: string
+          count: number
+          identity: string
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          count?: number
+          identity: string
+          window_start: string
+        }
+        Update: {
+          bucket?: string
+          count?: number
+          identity?: string
+          window_start?: string
         }
         Relationships: []
       }
@@ -352,6 +688,56 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          amount_pkr: number
+          created_at: string
+          current_period_end: string | null
+          id: string
+          organization_id: string
+          plan_tier: Database["public"]["Enums"]["plan_tier"]
+          property_count: number
+          safepay_plan_id: string
+          safepay_subscription_reference: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount_pkr: number
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          organization_id: string
+          plan_tier: Database["public"]["Enums"]["plan_tier"]
+          property_count?: number
+          safepay_plan_id: string
+          safepay_subscription_reference: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount_pkr?: number
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          organization_id?: string
+          plan_tier?: Database["public"]["Enums"]["plan_tier"]
+          property_count?: number
+          safepay_plan_id?: string
+          safepay_subscription_reference?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -375,6 +761,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      autonomy_level_allowed: {
+        Args: { _level: string; _property_id: string }
+        Returns: boolean
+      }
+      can_org_admin_add_property: {
+        Args: { _organization_id: string }
+        Returns: boolean
+      }
+      can_switch_to_property: {
+        Args: { _new_property_id: string }
+        Returns: boolean
+      }
+      check_rate_limit: {
+        Args: {
+          _bucket: string
+          _identity: string
+          _max: number
+          _window_secs: number
+        }
+        Returns: boolean
+      }
+      conversation_owner: { Args: { _conv_id: string }; Returns: string }
       current_staff_property_id: { Args: never; Returns: string }
       has_role: {
         Args: {
@@ -383,13 +791,37 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_org_admin_for_property: {
+        Args: { _property_id: string }
+        Returns: boolean
+      }
+      org_has_plan_at_least: {
+        Args: {
+          min_tier: Database["public"]["Enums"]["plan_tier"]
+          org_id: string
+        }
+        Returns: boolean
+      }
+      property_has_plan_at_least: {
+        Args: {
+          _property_id: string
+          min_tier: Database["public"]["Enums"]["plan_tier"]
+        }
+        Returns: boolean
+      }
       property_id_for_conversation: {
         Args: { _conv_id: string }
         Returns: string
       }
+      starter_conversation_limit_ok: {
+        Args: { _property_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "agent"
+      plan_tier: "starter" | "growth" | "pro"
+      subscription_status: "active" | "past_due" | "canceled" | "incomplete"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -518,6 +950,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "agent"],
+      plan_tier: ["starter", "growth", "pro"],
+      subscription_status: ["active", "past_due", "canceled", "incomplete"],
     },
   },
 } as const
