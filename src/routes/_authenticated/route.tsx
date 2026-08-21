@@ -221,7 +221,7 @@ function AuthedLayout() {
                     <SidebarMenuItem key={item.to}>
                       <SidebarMenuButton asChild isActive={pathname === item.to} tooltip={item.label}>
                         <Link to={item.to} className="flex items-center gap-2">
-                          <item.icon className="h-4 w-4" />
+                          <item.icon className={`h-4 w-4 ${pathname === item.to ? "text-brand" : ""}`} />
                           <span>{item.label}</span>
                         </Link>
                       </SidebarMenuButton>
@@ -231,7 +231,7 @@ function AuthedLayout() {
                     <SidebarMenuItem key="/organization">
                       <SidebarMenuButton asChild isActive={pathname === "/organization"} tooltip="Organisation">
                         <Link to={"/organization" as "/settings"} className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4" />
+                          <Building2 className={`h-4 w-4 ${pathname === "/organization" ? "text-brand" : ""}`} />
                           <span>Organisation</span>
                         </Link>
                       </SidebarMenuButton>
