@@ -61,7 +61,7 @@ function PlatformAdminLayout() {
                   pathname === item.to ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <item.icon className="h-3.5 w-3.5" />
+                <item.icon className={`h-3.5 w-3.5 ${pathname === item.to ? "text-brand" : ""}`} />
                 {item.label}
               </Link>
             ))}
