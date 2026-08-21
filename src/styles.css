@@ -92,6 +92,45 @@
   --sidebar-ring: oklch(0.55 0.05 200);
 }
 
+/* Dark theme — toggled via the .dark class on <html> (see ThemeToggle).
+ * Same token names/roles as :root, values inverted for a dark neutral
+ * surface. Brand/ring hue kept close to the light theme's teal so a
+ * property's brand accent still reads consistently either way. */
+.dark {
+  --background: oklch(0.17 0.012 260);
+  --foreground: oklch(0.94 0.006 90);
+  --card: oklch(0.21 0.013 260);
+  --card-foreground: oklch(0.94 0.006 90);
+  --popover: oklch(0.21 0.013 260);
+  --popover-foreground: oklch(0.94 0.006 90);
+  --primary: oklch(0.92 0.01 250);
+  --primary-foreground: oklch(0.18 0.02 260);
+  --secondary: oklch(0.27 0.014 260);
+  --secondary-foreground: oklch(0.92 0.01 250);
+  --muted: oklch(0.25 0.013 260);
+  --muted-foreground: oklch(0.66 0.02 250);
+  --accent: oklch(0.27 0.014 260);
+  --accent-foreground: oklch(0.92 0.01 250);
+  --destructive: oklch(0.64 0.2 27);
+  --destructive-foreground: oklch(0.98 0.003 90);
+  --border: oklch(0.31 0.013 260);
+  --input: oklch(0.31 0.013 260);
+  --ring: oklch(0.65 0.08 200);
+
+  --brand: oklch(0.6 0.1 200);
+  --brand-foreground: oklch(0.99 0.003 90);
+  --cream: oklch(0.21 0.016 70);
+
+  --sidebar: oklch(0.185 0.011 260);
+  --sidebar-foreground: oklch(0.92 0.01 250);
+  --sidebar-primary: oklch(0.92 0.01 250);
+  --sidebar-primary-foreground: oklch(0.18 0.02 260);
+  --sidebar-accent: oklch(0.25 0.013 260);
+  --sidebar-accent-foreground: oklch(0.92 0.01 250);
+  --sidebar-border: oklch(0.3 0.013 260);
+  --sidebar-ring: oklch(0.65 0.08 200);
+}
+
 /* Guest surface: applied via className="guest-surface" on the guest route root */
 .guest-surface {
   --background: var(--cream);
@@ -105,6 +144,19 @@
   --border: oklch(0.9 0.015 80);
   --input: oklch(0.9 0.015 80);
   --ring: var(--brand);
+}
+
+/* --background/--primary/--ring above already reference var(--cream) /
+ * var(--brand), which the .dark block redefines — those inherit the dark
+ * value automatically. Only the hardcoded literals below need overriding. */
+.dark .guest-surface {
+  --foreground: oklch(0.92 0.01 60);
+  --card: oklch(0.22 0.015 70);
+  --card-foreground: oklch(0.92 0.01 60);
+  --muted: oklch(0.26 0.016 70);
+  --muted-foreground: oklch(0.62 0.02 60);
+  --border: oklch(0.32 0.016 70);
+  --input: oklch(0.32 0.016 70);
 }
 
 @layer base {
