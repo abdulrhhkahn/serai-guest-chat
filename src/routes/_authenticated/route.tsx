@@ -156,7 +156,7 @@ function AuthedLayout() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DropdownMenuTrigger asChild>
-                      <button className="flex w-full items-center gap-2 px-2 py-2 hover:bg-sidebar-accent rounded-md transition text-left">
+                      <button className="flex w-full items-center gap-2 px-2 py-2 hover:bg-sidebar-accent rounded-md transition text-left group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
                         <div className="h-7 w-7 rounded-md flex-shrink-0" style={{ background: property?.brand_color ?? "#0b6b75" }} />
                         <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                           <div className="truncate text-sm font-serif">{property?.name ?? "Serai"}</div>
@@ -199,7 +199,7 @@ function AuthedLayout() {
             ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2 px-2 py-2">
+                  <div className="flex items-center gap-2 px-2 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
                     <div className="h-7 w-7 rounded-md flex-shrink-0" style={{ background: property?.brand_color ?? "#0b6b75" }} />
                     <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                       <div className="truncate text-sm font-serif">{property?.name ?? "Serai"}</div>
