@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -12,8 +13,33 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
+function greetingForHour(hour: number): string {
+  if (hour >= 5 && hour < 12) return "Good morning.";
+  if (hour >= 12 && hour < 17) return "Good afternoon.";
+  if (hour >= 17 && hour < 21) return "Good evening.";
+  return "Hope the night is peaceful.";
+}
+
+// Based on the browser's local time — correct for staff viewing the
+// dashboard from inside the hotel, since there's no per-property timezone
+// stored anywhere else in the app. Re-checks every minute so it flips over
+// live if the page is left open across a boundary, not just on load.
+function useTimeOfDayGreeting(): string {
+  const [greeting, setGreeting] = useState(() => greetingForHour(new Date().getHours()));
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setGreeting(greetingForHour(new Date().getHours()));
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  return greeting;
+}
+
 function Dashboard() {
   const today = format(new Date(), "yyyy-MM-dd");
+  const greeting = useTimeOfDayGreeting();
 
   const { data: stats } = useQuery({
     queryKey: ["dashboard-stats", today],
@@ -153,7 +179,7 @@ function Dashboard() {
   return (
     <div className="p-6 space-y-6 max-w-6xl">
       <div>
-        <h1 className="font-serif text-3xl">Good day.</h1>
+        <h1 className="font-serif text-3xl">{greeting}</h1>
         <p className="text-sm text-muted-foreground">Here's what's happening today.</p>
       </div>
 
