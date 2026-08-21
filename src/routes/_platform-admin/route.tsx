@@ -4,6 +4,7 @@ import { Shield, Building2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 /**
  * Separate pathless layout from _authenticated — deliberately does NOT
@@ -70,6 +71,7 @@ function PlatformAdminLayout() {
           <Link to="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
             Exit to hotel view
           </Link>
+          <ThemeToggle />
           <Button variant="ghost" size="sm" onClick={signOut}>
             <LogOut className="h-4 w-4 mr-1.5" /> Sign out
           </Button>
