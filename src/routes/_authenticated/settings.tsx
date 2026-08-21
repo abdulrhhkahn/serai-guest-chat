@@ -150,7 +150,7 @@ function SettingsPage() {
             <Label>URL</Label>
             <div className="flex gap-2">
               <Input readOnly value={guestUrl} />
-              <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText(guestUrl); toast.success("Copied"); }}>
+              <Button variant="outline" size="icon" title="Copy link" onClick={() => { navigator.clipboard.writeText(guestUrl); toast.success("Copied"); }}>
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
@@ -205,11 +205,11 @@ function AutonomyCard({ propertyId }: { propertyId: string }) {
       const cats = Array.from(new Set((faqs ?? []).map((f) => f.category).filter((c): c is string => !!c)));
       const ruleMap: Record<string, string> = {};
       (rules ?? []).forEach((r) => { ruleMap[r.category] = r.level; });
-      return { def: (prop?.default_autonomy as string) ?? "auto", cats, ruleMap };
+      return { def: (prop?.default_autonomy as string) ?? "suggest", cats, ruleMap };
     },
   });
 
-  const [def, setDef] = useState("auto");
+  const [def, setDef] = useState("suggest");
   const [rules, setRules] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   useEffect(() => { if (data) { setDef(data.def); setRules(data.ruleMap); } }, [data]);
