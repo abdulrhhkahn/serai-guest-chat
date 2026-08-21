@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect, useNavigate, Link, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarHeader, useSidebar } from "@/components/ui/sidebar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -38,6 +40,7 @@ function slugify(s: string) {
 
 function AuthedLayout() {
   const navigate = useNavigate();
+  const { state: sidebarState } = useSidebar();
   const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [creating, setCreating] = useState(false);
@@ -150,15 +153,22 @@ function AuthedLayout() {
           <SidebarHeader className="border-b border-sidebar-border">
             {(isAdmin || isOrgAdmin) && properties && properties.length > 0 ? (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex w-full items-center gap-2 px-2 py-2 hover:bg-sidebar-accent rounded-md transition text-left">
-                    <div className="h-7 w-7 rounded-md flex-shrink-0" style={{ background: property?.brand_color ?? "#0b6b75" }} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-serif">{property?.name ?? "Serai"}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">Switch property ▾</div>
-                    </div>
-                  </button>
-                </DropdownMenuTrigger>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex w-full items-center gap-2 px-2 py-2 hover:bg-sidebar-accent rounded-md transition text-left">
+                        <div className="h-7 w-7 rounded-md flex-shrink-0" style={{ background: property?.brand_color ?? "#0b6b75" }} />
+                        <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                          <div className="truncate text-sm font-serif">{property?.name ?? "Serai"}</div>
+                          <div className="truncate text-[11px] text-muted-foreground">Switch property ▾</div>
+                        </div>
+                      </button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" align="center" hidden={sidebarState !== "collapsed"}>
+                    {property?.name ?? "Serai"} — switch property
+                  </TooltipContent>
+                </Tooltip>
                 <DropdownMenuContent align="start" className="w-64">
                   <DropdownMenuLabel>Your properties</DropdownMenuLabel>
                   {properties.map((p) => (
@@ -187,13 +197,20 @@ function AuthedLayout() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="flex items-center gap-2 px-2 py-2">
-                <div className="h-7 w-7 rounded-md" style={{ background: property?.brand_color ?? "#0b6b75" }} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-serif">{property?.name ?? "Serai"}</div>
-                  <div className="truncate text-[11px] text-muted-foreground">Staff dashboard</div>
-                </div>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 px-2 py-2">
+                    <div className="h-7 w-7 rounded-md flex-shrink-0" style={{ background: property?.brand_color ?? "#0b6b75" }} />
+                    <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                      <div className="truncate text-sm font-serif">{property?.name ?? "Serai"}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">Staff dashboard</div>
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right" align="center" hidden={sidebarState !== "collapsed"}>
+                  {property?.name ?? "Serai"}
+                </TooltipContent>
+              </Tooltip>
             )}
           </SidebarHeader>
           <SidebarContent>
@@ -202,7 +219,7 @@ function AuthedLayout() {
                 <SidebarMenu>
                   {nav.map((item) => (
                     <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton asChild isActive={pathname === item.to}>
+                      <SidebarMenuButton asChild isActive={pathname === item.to} tooltip={item.label}>
                         <Link to={item.to} className="flex items-center gap-2">
                           <item.icon className="h-4 w-4" />
                           <span>{item.label}</span>
@@ -212,7 +229,7 @@ function AuthedLayout() {
                   ))}
                   {isOrgAdmin && (
                     <SidebarMenuItem key="/organization">
-                      <SidebarMenuButton asChild isActive={pathname === "/organization"}>
+                      <SidebarMenuButton asChild isActive={pathname === "/organization"} tooltip="Organisation">
                         <Link to={"/organization" as "/settings"} className="flex items-center gap-2">
                           <Building2 className="h-4 w-4" />
                           <span>Organisation</span>
@@ -225,18 +242,24 @@ function AuthedLayout() {
             </SidebarGroup>
           </SidebarContent>
           <SidebarFooter>
-            <Button variant="ghost" size="sm" onClick={signOut} className="justify-start">
-              <LogOut className="mr-2 h-4 w-4" /> Sign out
-            </Button>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={signOut} tooltip="Sign out">
+                  <LogOut className="h-4 w-4" />
+                  <span>Sign out</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
           </SidebarFooter>
         </Sidebar>
 
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-12 flex items-center gap-2 border-b border-border px-3 bg-card/50">
-            <SidebarTrigger />
-            <div className="text-sm text-muted-foreground capitalize">
+            <SidebarTrigger title="Toggle sidebar" />
+            <div className="text-sm text-muted-foreground capitalize flex-1">
               {pathname.replace("/", "") || "dashboard"}
             </div>
+            <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto">
             <Outlet />
