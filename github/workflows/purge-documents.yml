@@ -1,0 +1,23 @@
+name: Purge expired guest documents
+
+on:
+  schedule:
+    # Runs daily at 03:00 UTC — adjust if you want a different time.
+    - cron: "0 3 * * *"
+  workflow_dispatch: {} # lets you trigger it manually from the Actions tab to test
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call purge-documents endpoint
+        run: |
+          status=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            -X POST "${{ secrets.PURGE_APP_URL }}/api/admin/purge-documents" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}")
+          echo "Response body:"
+          cat /tmp/response.txt
+          if [ "$status" -ne 200 ]; then
+            echo "purge-documents returned HTTP $status"
+            exit 1
+          fi
