@@ -477,6 +477,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
                 <button
                   key={n}
                   aria-label={`Rate ${n} out of 5`}
+                  title={`Rate ${n} out of 5`}
                   className="text-xl leading-none opacity-60 hover:opacity-100 transition-opacity"
                   onClick={async () => {
                     setCsatRating(n);
@@ -495,7 +496,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
       </div>
       <div className="px-2 pb-2 flex gap-2">
         <Input value={text} onChange={(e) => setText(e.target.value)} placeholder={online ? "Type a message…" : "Offline — will queue"} onKeyDown={(e) => { if (e.key === "Enter") send(); }} />
-        <Button size="icon" onClick={send} disabled={sending || !text.trim()} style={{ background: brand, color: "white" }}>
+        <Button size="icon" title="Send" onClick={send} disabled={sending || !text.trim()} style={{ background: brand, color: "white" }}>
           <Send className="h-4 w-4" />
         </Button>
       </div>
