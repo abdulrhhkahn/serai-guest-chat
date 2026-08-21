@@ -54,13 +54,27 @@ function AuthedLayout() {
     },
   });
 
-  const { data: isOrgAdmin } = useQuery({
-    queryKey: ["is-org-admin"],
+  const { data: myOrgId } = useQuery({
+    queryKey: ["my-org-id"],
     queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return false;
-      const { data } = await supabase.from("org_admins").select("org_id").eq("user_id", u.user.id).limit(1);
-      return (data ?? []).length > 0;
+      if (!u.user) return null;
+      const { data } = await supabase.from("org_admins").select("org_id").eq("user_id", u.user.id).limit(1).maybeSingle();
+      return data?.org_id ?? null;
+    },
+  });
+  const isOrgAdmin = !!myOrgId;
+
+  // Adding a property is a Pro-tier feature (orgRollup/multi-property in
+  // src/lib/billing.ts) — this only controls whether the button is SHOWN;
+  // the actual enforcement is the RLS insert policy on properties, since a
+  // client-side check alone can be bypassed.
+  const { data: orgCanAddProperty } = useQuery({
+    queryKey: ["org-can-add-property", myOrgId],
+    enabled: !!myOrgId,
+    queryFn: async () => {
+      const { data } = await supabase.rpc("org_has_plan_at_least", { org_id: myOrgId!, min_tier: "pro" });
+      return !!data;
     },
   });
 
@@ -75,10 +89,12 @@ function AuthedLayout() {
   });
 
   const { data: properties } = useQuery({
-    queryKey: ["all-properties", isAdmin],
-    enabled: !!isAdmin,
+    queryKey: ["all-properties", isAdmin, myOrgId],
+    enabled: !!isAdmin || !!myOrgId,
     queryFn: async () => {
-      const { data } = await supabase.from("properties").select("id,name,slug,brand_color").order("name");
+      let query = supabase.from("properties").select("id,name,slug,brand_color").order("name");
+      if (!isAdmin && myOrgId) query = query.eq("organization_id", myOrgId);
+      const { data } = await query;
       return data ?? [];
     },
   });
@@ -86,6 +102,12 @@ function AuthedLayout() {
   async function switchTo(propertyId: string) {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
+    // Belt-and-suspenders: the real boundary is the RLS policy on
+    // staff_profiles (see enforce_staff_property_switch migration) — this
+    // just avoids firing an update we know will be rejected.
+    if (!isAdmin && !(properties ?? []).some((p) => p.id === propertyId)) {
+      return toast.error("You can't switch to a property outside your organisation");
+    }
     const { error } = await supabase.from("staff_profiles").update({ property_id: propertyId }).eq("id", u.user.id);
     if (error) return toast.error(error.message);
     toast.success("Switched property");
@@ -97,8 +119,13 @@ function AuthedLayout() {
     setSaving(true);
     try {
       const slug = slugify(newName);
-      const { data, error } = await supabase.from("properties").insert({ name: newName.trim(), slug }).select("id").single();
+      const { data, error } = await supabase
+        .from("properties")
+        .insert({ name: newName.trim(), slug, organization_id: isAdmin ? null : myOrgId })
+        .select("id")
+        .single();
       if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ["all-properties"] });
       await switchTo(data.id);
       setCreating(false);
       setNewName("");
@@ -121,7 +148,7 @@ function AuthedLayout() {
       <div className="min-h-screen flex w-full bg-background">
         <Sidebar collapsible="icon">
           <SidebarHeader className="border-b border-sidebar-border">
-            {isAdmin && properties && properties.length > 0 ? (
+            {(isAdmin || isOrgAdmin) && properties && properties.length > 0 ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex w-full items-center gap-2 px-2 py-2 hover:bg-sidebar-accent rounded-md transition text-left">
@@ -141,10 +168,22 @@ function AuthedLayout() {
                       {p.id === property?.id && <Check className="h-3.5 w-3.5" />}
                     </DropdownMenuItem>
                   ))}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setCreating(true)}>
-                    <Plus className="h-4 w-4" /> New property
-                  </DropdownMenuItem>
+                  {(isAdmin || orgCanAddProperty) && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setCreating(true)}>
+                        <Plus className="h-4 w-4" /> New property
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {!isAdmin && isOrgAdmin && !orgCanAddProperty && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                        Adding properties requires the Pro plan.
+                      </div>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
