@@ -456,8 +456,8 @@ function InboxPage() {
   });
 
   return (
-    <div className="h-[calc(100vh-3rem)] grid grid-cols-1 md:grid-cols-[320px_1fr]">
-      <aside className="border-r border-border overflow-y-auto bg-card/30">
+    <div className="h-[calc(100vh-3rem)] grid grid-cols-1 md:grid-cols-[360px_1fr]">
+      <aside className="border-r border-border overflow-y-auto overflow-x-hidden bg-card/30">
         <div className="p-4 border-b border-border">
           <h2 className="font-serif text-xl">Inbox</h2>
           <p className="text-xs text-muted-foreground">{conversations?.length ?? 0} conversations</p>
@@ -499,9 +499,19 @@ function InboxPage() {
               <option value="resolved">Resolved</option>
             </select>
             <div className="flex items-center gap-1.5">
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" />
-              <span className="text-xs text-muted-foreground">→</span>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" />
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-8 min-w-0 flex-1 text-xs px-1.5"
+              />
+              <span className="text-xs text-muted-foreground shrink-0">→</span>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-8 min-w-0 flex-1 text-xs px-1.5"
+              />
             </div>
             {filtersActive && (
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
