@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { GuestTurnstile } from "@/components/GuestTurnstile";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -17,23 +18,34 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-const DEMO_EMAIL = "demo@serai.test";
-const DEMO_PASSWORD = "demo1234";
-
 function AuthPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  
+  // Reused from the guest chat — renders nothing unless VITE_TURNSTILE_SITE_KEY
+  // is set, so this is a no-op until Turnstile is actually configured. Once
+  // configured, also turn on CAPTCHA protection in Supabase's own dashboard
+  // (Authentication → Attack Protection) with the matching secret key —
+  // that's what actually verifies the token server-side; passing it here
+  // alone does nothing unless Supabase is told to check it.
+  const [signInToken, setSignInToken] = useState("");
+  const [signUpToken, setSignUpToken] = useState("");
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: signInToken ? { captchaToken: signInToken } : undefined,
+    });
     setLoading(false);
-    if (error) return toast.error(error.message);
+    setSignInToken("");
+    // Generic message regardless of whether the email exists or the
+    // password was wrong — avoids confirming which accounts exist.
+    if (error) return toast.error("Invalid email or password.");
     navigate({ to: "/dashboard" });
   }
 
@@ -46,14 +58,15 @@ function AuthPage() {
       options: {
         emailRedirectTo: `${window.location.origin}/dashboard`,
         data: { full_name: name },
+        ...(signUpToken ? { captchaToken: signUpToken } : {}),
       },
     });
     setLoading(false);
+    setSignUpToken("");
     if (error) return toast.error(error.message);
     toast.success("Account created. You're signed in.");
     navigate({ to: "/dashboard" });
   }
-
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -81,12 +94,27 @@ function AuthPage() {
                 <form onSubmit={signIn} className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <Input
+                      id="email"
+                      type="email"
+                      required
+                      autoComplete="username"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <Input
+                      id="password"
+                      type="password"
+                      required
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
                   </div>
+                  <GuestTurnstile onToken={setSignInToken} />
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Signing in…" : "Sign in"}
                   </Button>
@@ -96,16 +124,33 @@ function AuthPage() {
                 <form onSubmit={signUp} className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Full name</Label>
-                    <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
+                    <Input id="name" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email2">Email</Label>
-                    <Input id="email2" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <Input
+                      id="email2"
+                      type="email"
+                      required
+                      autoComplete="username"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password2">Password</Label>
-                    <Input id="password2" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <Input
+                      id="password2"
+                      type="password"
+                      required
+                      minLength={8}
+                      autoComplete="new-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">At least 8 characters.</p>
                   </div>
+                  <GuestTurnstile onToken={setSignUpToken} />
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Creating…" : "Create account"}
                   </Button>
@@ -115,15 +160,6 @@ function AuthPage() {
                 </form>
               </TabsContent>
             </Tabs>
-            <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/40 p-3">
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">For testing only</div>
-              <div className="mt-1 text-xs">
-                Email: <span className="font-mono">{DEMO_EMAIL}</span>
-              </div>
-              <div className="text-xs">
-                Password: <span className="font-mono">{DEMO_PASSWORD}</span>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
