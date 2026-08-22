@@ -1,8 +1,7 @@
-import { createFileRoute, Outlet, redirect, Link, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Shield, Building2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -10,18 +9,27 @@ import { ThemeToggle } from "@/components/theme-toggle";
  * Separate pathless layout from _authenticated — deliberately does NOT
  * reuse that layout's hotel sidebar (property switcher, guest-ops nav).
  * This is Abdul's own internal tool, not something a hotel admin should
- * ever see the chrome of. Gated to the site-wide `admin` role; anyone else
- * (including org admins) gets bounced to the regular dashboard.
+ * ever see the chrome of.
+ *
+ * Two independent gates, neither of which a hotel's own staff account can
+ * satisfy on its own:
+ *   1. Supabase session + the site-wide `admin` role
+ *   2. A separate passphrase (see /admin-login, /api/admin/verify-passphrase)
+ *      that isn't part of the Supabase user database at all
+ * Missing either sends you to /admin-login, not the regular staff /auth
+ * page — this surface is never reachable through the shared staff sign-in.
  */
 export const Route = createFileRoute("/_platform-admin")({
   ssr: false,
   beforeLoad: async () => {
     const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user || data.user.is_anonymous) throw redirect({ to: "/auth" });
+    if (error || !data.user || data.user.is_anonymous) throw redirect({ to: "/admin-login" });
 
     const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
     const isAdmin = (roles ?? []).some((r) => r.role === "admin");
-    if (!isAdmin) throw redirect({ to: "/dashboard" });
+    if (!isAdmin) throw redirect({ to: "/admin-login" });
+
+    if (!sessionStorage.getItem("admin_gate_token")) throw redirect({ to: "/admin-login" });
 
     return { user: data.user };
   },
@@ -38,10 +46,11 @@ function PlatformAdminLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   async function signOut() {
+    sessionStorage.removeItem("admin_gate_token");
     await qc.cancelQueries();
     qc.clear();
     await supabase.auth.signOut();
-    navigate({ to: "/auth", replace: true });
+    navigate({ to: "/admin-login", replace: true });
   }
 
   return (
@@ -68,9 +77,6 @@ function PlatformAdminLayout() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
-          <Link to="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
-            Exit to hotel view
-          </Link>
           <ThemeToggle />
           <Button variant="ghost" size="sm" onClick={signOut}>
             <LogOut className="h-4 w-4 mr-1.5" /> Sign out
