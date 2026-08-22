@@ -38,9 +38,20 @@ function slugify(s: string) {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || `hotel-${Date.now()}`;
 }
 
+// useSidebar() only works in a component rendered INSIDE <SidebarProvider>'s
+// tree — AuthedLayout itself creates that provider, so it can't call the
+// hook directly. This tiny wrapper is a child of the provider instead.
+function CollapsedTooltipContent({ children, ...props }: React.ComponentProps<typeof TooltipContent>) {
+  const { state } = useSidebar();
+  return (
+    <TooltipContent {...props} hidden={state !== "collapsed"}>
+      {children}
+    </TooltipContent>
+  );
+}
+
 function AuthedLayout() {
   const navigate = useNavigate();
-  const { state: sidebarState } = useSidebar();
   const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [creating, setCreating] = useState(false);
@@ -165,9 +176,9 @@ function AuthedLayout() {
                       </button>
                     </DropdownMenuTrigger>
                   </TooltipTrigger>
-                  <TooltipContent side="right" align="center" hidden={sidebarState !== "collapsed"}>
+                  <CollapsedTooltipContent side="right" align="center">
                     {property?.name ?? "Serai"} — switch property
-                  </TooltipContent>
+                  </CollapsedTooltipContent>
                 </Tooltip>
                 <DropdownMenuContent align="start" className="w-64">
                   <DropdownMenuLabel>Your properties</DropdownMenuLabel>
@@ -207,9 +218,9 @@ function AuthedLayout() {
                     </div>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="right" align="center" hidden={sidebarState !== "collapsed"}>
+                <CollapsedTooltipContent side="right" align="center">
                   {property?.name ?? "Serai"}
-                </TooltipContent>
+                </CollapsedTooltipContent>
               </Tooltip>
             )}
           </SidebarHeader>
