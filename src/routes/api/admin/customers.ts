@@ -6,10 +6,13 @@ import { PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
 /**
  * Platform-admin customer onboarding. Unlike /api/admin/org, which requires
  * the caller to already be an admin of the target org, these actions are
- * gated purely by the site-wide `admin` role (user_roles), since the whole
- * point is bootstrapping orgs that don't have any admins yet.
+ * gated purely by the site-wide `admin` role (user_roles) PLUS a separate
+ * passphrase header — see /admin-login and /api/admin/verify-passphrase.
+ * The passphrase isn't stored in the Supabase user database at all, so a
+ * compromised staff/admin Supabase session alone still can't reach this.
  *
  * POST body: { action, ...args }
+ *   createHotel          { hotelName, adminName?, adminEmail } — the main flow
  *   createOrg            { name }
  *   assignProperty       { orgId, propertyId }
  *   addOrgAdmin          { orgId, email }
@@ -21,6 +24,10 @@ export const Route = createFileRoute("/api/admin/customers")({
       POST: async ({ request }) => {
         const authHeader = request.headers.get("Authorization");
         if (!authHeader) return new Response("Unauthorized", { status: 401 });
+
+        const gateSecret = process.env.PLATFORM_ADMIN_PASSPHRASE;
+        const gateHeader = request.headers.get("x-admin-gate");
+        if (!gateSecret || gateHeader !== gateSecret) return new Response("Unauthorized", { status: 401 });
 
         const asUser = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
           global: { headers: { Authorization: authHeader } },
@@ -45,7 +52,51 @@ export const Route = createFileRoute("/api/admin/customers")({
         const ok = (data: unknown = {}) => Response.json({ ok: true, ...(data as object) });
         const bad = (msg: string, code = 400) => new Response(msg, { status: code });
 
+        function slugify(s: string) {
+          return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || `hotel-${Date.now()}`;
+        }
+
         switch (action) {
+          // The main onboarding flow: hotel name + admin's email in one
+          // step. Creates the org, the property, invites the admin via
+          // Supabase's own email (creates their auth.users row immediately,
+          // so we can add them to org_admins right away without waiting
+          // for them to click the link), and logs a staff_invites row.
+          case "createHotel": {
+            const hotelName = String(body.hotelName ?? "").trim();
+            const adminName = body.adminName ? String(body.adminName).trim() : undefined;
+            const adminEmail = String(body.adminEmail ?? "").trim();
+            if (!hotelName) return bad("Hotel name required");
+            if (!isValidEmail(adminEmail)) return bad("Invalid admin email");
+
+            const { data: org, error: orgErr } = await supabaseAdmin
+              .from("organizations").insert({ name: hotelName }).select("id").single();
+            if (orgErr) return bad(orgErr.message, 500);
+
+            const { data: property, error: propErr } = await supabaseAdmin
+              .from("properties")
+              .insert({ name: hotelName, slug: slugify(hotelName), organization_id: org.id })
+              .select("id")
+              .single();
+            if (propErr) return bad(propErr.message, 500);
+
+            const appUrl = process.env.APP_URL ?? new URL(request.url).origin;
+            const { data: invited, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(adminEmail, {
+              data: { invited_property_id: property.id, full_name: adminName },
+              redirectTo: `${appUrl}/dashboard`,
+            });
+            if (inviteErr || !invited?.user) return bad(inviteErr?.message ?? "Invite failed", 500);
+
+            await supabaseAdmin.from("org_admins").upsert({ org_id: org.id, user_id: invited.user.id });
+            await supabaseAdmin.from("staff_invites").insert({
+              property_id: property.id,
+              email: adminEmail,
+              invited_by: uid,
+            });
+
+            return ok({ orgId: org.id, propertyId: property.id });
+          }
+
           case "createOrg": {
             const name = String(body.name ?? "").trim();
             if (!name) return bad("Name required");
@@ -88,10 +139,6 @@ export const Route = createFileRoute("/api/admin/customers")({
 
             const { error } = await supabaseAdmin.from("subscriptions").insert({
               organization_id: orgId,
-              // No real Safepay checkout happened — this is a manually
-              // activated subscription (e.g. bank transfer, trial grant).
-              // Reference must stay unique per row since it's the webhook's
-              // reconciliation key for real Safepay-originated rows.
               safepay_subscription_reference: `manual-${orgId}-${Date.now()}`,
               safepay_plan_id: plan.planId,
               plan_tier: planTier,
