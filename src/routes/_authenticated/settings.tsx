@@ -139,6 +139,8 @@ function SettingsPage() {
 
       <MessagingNumbersCard propertyId={form.id} />
 
+      <StaffCard propertyId={form.id} />
+
       <Card className="p-5">
         <h2 className="font-medium">Guest check-in link</h2>
         <p className="text-sm text-muted-foreground mb-4">Print or share this QR so guests can check in from their phone.</p>
@@ -359,6 +361,105 @@ function MessagingNumbersCard({ propertyId }: { propertyId: string }) {
           <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+14155551234" className="mt-1" />
         </div>
         <Button onClick={add} disabled={adding}>{adding ? "Adding…" : "Add"}</Button>
+      </div>
+    </Card>
+  );
+}
+
+async function callInviteStaff(body: { propertyId: string; email: string; fullName?: string }) {
+  const { data: s } = await supabase.auth.getSession();
+  const res = await fetch("/api/admin/invite-staff", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function StaffCard({ propertyId }: { propertyId: string }) {
+  const qc = useQueryClient();
+  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [inviting, setInviting] = useState(false);
+
+  const { data: staff } = useQuery({
+    queryKey: ["property-staff", propertyId],
+    queryFn: async () => {
+      const { data } = await supabase.from("staff_profiles").select("id, full_name").eq("property_id", propertyId);
+      return data ?? [];
+    },
+  });
+
+  const { data: invites } = useQuery({
+    queryKey: ["property-invites", propertyId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("staff_invites")
+        .select("id, email, status, created_at")
+        .eq("property_id", propertyId)
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+
+  async function invite() {
+    if (!email.trim()) return;
+    setInviting(true);
+    try {
+      await callInviteStaff({ propertyId, email: email.trim(), fullName: fullName.trim() || undefined });
+      toast.success(`Invite sent to ${email.trim()}`);
+      setEmail("");
+      setFullName("");
+      qc.invalidateQueries({ queryKey: ["property-invites", propertyId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to invite");
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div>
+        <h2 className="font-medium">Staff</h2>
+        <p className="text-sm text-muted-foreground">
+          Invite someone by email — they'll get a link from Supabase to set their password and land here directly, no shared demo account involved.
+        </p>
+      </div>
+
+      {(staff?.length ?? 0) > 0 && (
+        <ul className="text-sm space-y-1">
+          {staff!.map((s) => (
+            <li key={s.id} className="flex items-center gap-2">
+              <span>{s.full_name || "Unnamed"}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {(invites?.length ?? 0) > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Invites</p>
+          {invites!.map((inv) => (
+            <div key={inv.id} className="flex items-center gap-2 text-sm">
+              <span className="flex-1">{inv.email}</span>
+              <span className="rounded-md bg-muted px-2 py-0.5 text-xs capitalize">{inv.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+        <div className="flex-1">
+          <Label>Full name</Label>
+          <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Optional" className="mt-1" />
+        </div>
+        <div className="flex-1">
+          <Label>Email</Label>
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="staff@hotel.com" className="mt-1" />
+        </div>
+        <Button onClick={invite} disabled={inviting || !email.trim()}>{inviting ? "Inviting…" : "Send invite"}</Button>
       </div>
     </Card>
   );
