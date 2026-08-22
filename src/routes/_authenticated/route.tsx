@@ -286,11 +286,10 @@ function AuthedLayout() {
           <div className="space-y-2">
             <Label htmlFor="new-prop-name">Property name</Label>
             <Input id="new-prop-name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Casa del Mar" autoFocus />
-            <p className="text-xs text-muted-foreground">A guest link will be generated at /checkin/{slugify(newName || "your-hotel")}.</p>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCreating(false)}>Cancel</Button>
-            <Button onClick={createProperty} disabled={!newName.trim() || saving}>{saving ? "Creating…" : "Create & switch"}</Button>
+            <Button onClick={createProperty} disabled={!newName.trim() || saving}>{saving ? "Creating…" : "Add Property"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
