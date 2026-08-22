@@ -32,7 +32,7 @@ type Property = {
 
 function SettingsPage() {
   const qc = useQueryClient();
-  const { data: property } = useQuery({
+  const { data: property, isLoading: propertyLoading, isError: propertyError } = useQuery({
     queryKey: ["current-property"],
     queryFn: async () => {
       const { data: prof } = await supabase.from("staff_profiles").select("property_id").maybeSingle();
@@ -48,7 +48,23 @@ function SettingsPage() {
 
   useEffect(() => { if (property) setForm(property); }, [property]);
 
-  if (!form) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (propertyLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (propertyError) {
+    return (
+      <div className="p-6 max-w-md">
+        <p className="text-sm text-destructive">Couldn't load your property. Try refreshing the page.</p>
+      </div>
+    );
+  }
+  if (!form) {
+    return (
+      <div className="p-6 max-w-md">
+        <p className="text-sm text-muted-foreground">
+          Your account isn't linked to a property yet. Contact your hotel's admin to get set up.
+        </p>
+      </div>
+    );
+  }
 
   const guestUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/checkin/${form.slug}`;
 
