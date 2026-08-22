@@ -115,7 +115,7 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
   const [hotelName, setHotelName] = useState("");
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
-  const [planTier, setPlanTier] = useState<"starter" | PlanTier>("starter");
+  const [planTier, setPlanTier] = useState<"basic" | PlanTier>("basic");
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -137,7 +137,7 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
       setHotelName("");
       setAdminName("");
       setAdminEmail("");
-      setPlanTier("starter");
+      setPlanTier("basic");
       onDone();
     } catch (e) {
       toast.error(String((e as Error).message));
@@ -171,10 +171,10 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
         </div>
         <div>
           <Label className="text-xs">Plan</Label>
-          <Select value={planTier} onValueChange={(v) => setPlanTier(v as "starter" | PlanTier)}>
+          <Select value={planTier} onValueChange={(v) => setPlanTier(v as "basic" | PlanTier)}>
             <SelectTrigger className="mt-1 w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="starter">Starter (free)</SelectItem>
+              <SelectItem value="basic">Basic (free)</SelectItem>
               <SelectItem value="growth">Growth</SelectItem>
               <SelectItem value="pro">Pro</SelectItem>
             </SelectContent>
