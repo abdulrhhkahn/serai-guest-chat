@@ -12,6 +12,35 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_property_switch_log: {
+        Row: {
+          admin_user_id: string
+          id: string
+          property_id: string | null
+          switched_at: string
+        }
+        Insert: {
+          admin_user_id: string
+          id?: string
+          property_id?: string | null
+          switched_at?: string
+        }
+        Update: {
+          admin_user_id?: string
+          id?: string
+          property_id?: string | null
+          switched_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_property_switch_log_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_decisions: {
         Row: {
           category: string | null
@@ -817,6 +846,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      conversation_limit_ok: {
+        Args: { _property_id: string }
+        Returns: boolean
+      }
       conversation_owner: { Args: { _conv_id: string }; Returns: string }
       current_staff_property_id: { Args: never; Returns: string }
       has_role: {
@@ -853,14 +886,10 @@ export type Database = {
         Returns: string
       }
       staff_seat_limit_ok: { Args: { _property_id: string }; Returns: boolean }
-      starter_conversation_limit_ok: {
-        Args: { _property_id: string }
-        Returns: boolean
-      }
     }
     Enums: {
       app_role: "admin" | "agent"
-      plan_tier: "starter" | "growth" | "pro"
+      plan_tier: "basic" | "growth" | "pro"
       subscription_status: "active" | "past_due" | "canceled" | "incomplete"
     }
     CompositeTypes: {
@@ -990,7 +1019,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "agent"],
-      plan_tier: ["starter", "growth", "pro"],
+      plan_tier: ["basic", "growth", "pro"],
       subscription_status: ["active", "past_due", "canceled", "incomplete"],
     },
   },
