@@ -852,6 +852,7 @@ export type Database = {
         Args: { _conv_id: string }
         Returns: string
       }
+      staff_seat_limit_ok: { Args: { _property_id: string }; Returns: boolean }
       starter_conversation_limit_ok: {
         Args: { _property_id: string }
         Returns: boolean
