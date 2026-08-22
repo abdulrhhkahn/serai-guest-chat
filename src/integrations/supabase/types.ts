@@ -659,6 +659,41 @@ export type Database = {
           },
         ]
       }
+      staff_invites: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string
+          property_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          invited_by: string
+          property_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string
+          property_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_invites_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_profiles: {
         Row: {
           created_at: string
@@ -794,6 +829,10 @@ export type Database = {
       is_org_admin_for_property: {
         Args: { _property_id: string }
         Returns: boolean
+      }
+      mark_staff_invite_accepted: {
+        Args: { _email: string; _property_id: string }
+        Returns: undefined
       }
       org_has_plan_at_least: {
         Args: {
