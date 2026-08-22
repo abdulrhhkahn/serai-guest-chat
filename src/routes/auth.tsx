@@ -93,9 +93,6 @@ function AuthPage() {
                 {loading ? "Signing in…" : "Sign in"}
               </Button>
             </form>
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              New staff are invited by their hotel's admin — no self-signup.
-            </p>
           </CardContent>
         </Card>
       </div>
