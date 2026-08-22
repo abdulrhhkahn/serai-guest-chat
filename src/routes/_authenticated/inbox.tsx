@@ -765,7 +765,8 @@ function InboxPage() {
                             onClick={async () => {
                               const title = window.prompt("Template title?");
                               if (!title || !draft.trim()) return toast.error("Type a reply first, then save.");
-                              const { data: prof } = await supabase.from("staff_profiles").select("property_id").maybeSingle();
+                              const { data: auth } = await supabase.auth.getUser();
+                              const { data: prof } = await supabase.from("staff_profiles").select("property_id").eq("id", auth.user?.id ?? "").maybeSingle();
                               if (!prof?.property_id) return toast.error("No property");
                               const { error } = await supabase.from("response_templates").insert({
                                 property_id: prof.property_id, title, body: draft.trim(),

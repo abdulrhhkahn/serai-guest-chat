@@ -35,7 +35,8 @@ function SettingsPage() {
   const { data: property, isLoading: propertyLoading, isError: propertyError } = useQuery({
     queryKey: ["current-property"],
     queryFn: async () => {
-      const { data: prof } = await supabase.from("staff_profiles").select("property_id").maybeSingle();
+      const { data: auth } = await supabase.auth.getUser();
+      const { data: prof } = await supabase.from("staff_profiles").select("property_id").eq("id", auth.user?.id ?? "").maybeSingle();
       if (!prof?.property_id) return null;
       const { data } = await supabase.from("properties").select("*").eq("id", prof.property_id).maybeSingle();
       return data as Property | null;

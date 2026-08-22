@@ -105,7 +105,8 @@ function FaqDialog({ editing, onDone }: { editing: Faq | null; onDone: () => voi
       const { error } = await supabase.from("faqs").update({ question, answer, category: category || null }).eq("id", editing.id);
       if (error) { setSaving(false); return toast.error(error.message); }
     } else {
-      const { data: prof } = await supabase.from("staff_profiles").select("property_id").maybeSingle();
+      const { data: auth } = await supabase.auth.getUser();
+      const { data: prof } = await supabase.from("staff_profiles").select("property_id").eq("id", auth.user?.id ?? "").maybeSingle();
       if (!prof?.property_id) { setSaving(false); return toast.error("No property linked"); }
       const { error } = await supabase.from("faqs").insert({ question, answer, category: category || null, property_id: prof.property_id });
       if (error) { setSaving(false); return toast.error(error.message); }

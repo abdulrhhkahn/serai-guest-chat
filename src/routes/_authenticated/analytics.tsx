@@ -90,7 +90,8 @@ function AnalyticsPage() {
   const { data: myProperty, isLoading: myPropertyLoading, isError: myPropertyError } = useQuery({
     queryKey: ["current-property"],
     queryFn: async () => {
-      const { data: prof } = await supabase.from("staff_profiles").select("property_id, full_name").maybeSingle();
+      const { data: auth } = await supabase.auth.getUser();
+      const { data: prof } = await supabase.from("staff_profiles").select("property_id, full_name").eq("id", auth.user?.id ?? "").maybeSingle();
       if (!prof?.property_id) return null;
       const { data: p } = await supabase.from("properties").select("*").eq("id", prof.property_id).maybeSingle();
       return p;
