@@ -23,9 +23,14 @@ type Org = {
 
 async function callAdmin(body: Record<string, unknown>) {
   const { data: s } = await supabase.auth.getSession();
+  const gate = sessionStorage.getItem("admin_gate_token") ?? "";
   const res = await fetch("/api/admin/customers", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${s.session?.access_token ?? ""}`,
+      "x-admin-gate": gate,
+    },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -76,14 +81,19 @@ function CustomersAdminPage() {
     <div className="p-6 max-w-4xl space-y-6">
       <div>
         <h1 className="font-serif text-3xl">Customer onboarding</h1>
-        <p className="text-sm text-muted-foreground">Assign hotels to organisations and activate their plan. Internal tool — not visible to hotel staff.</p>
+        <p className="text-sm text-muted-foreground">Internal tool — not visible to hotel staff.</p>
       </div>
 
-      <NewOrgCard onDone={refreshAll} />
+      <NewHotelCard onDone={refreshAll} />
 
       {(unassigned?.length ?? 0) > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Unassigned properties</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Unassigned properties</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Legacy or leftover properties not tied to an organisation — new hotels created above don't end up here.
+            </p>
+          </CardHeader>
           <CardContent className="space-y-3">
             {unassigned!.map((p) => (
               <AssignPropertyRow key={p.id} propertyId={p.id} propertyName={p.name} orgs={orgs ?? []} onDone={refreshAll} />
@@ -101,17 +111,26 @@ function CustomersAdminPage() {
   );
 }
 
-function NewOrgCard({ onDone }: { onDone: () => void }) {
-  const [name, setName] = useState("");
+function NewHotelCard({ onDone }: { onDone: () => void }) {
+  const [hotelName, setHotelName] = useState("");
+  const [adminName, setAdminName] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function create() {
-    if (!name.trim()) return;
+  async function save() {
+    if (!hotelName.trim() || !adminEmail.trim()) return;
     setSaving(true);
     try {
-      await callAdmin({ action: "createOrg", name: name.trim() });
-      toast.success("Organisation created");
-      setName("");
+      await callAdmin({
+        action: "createHotel",
+        hotelName: hotelName.trim(),
+        adminName: adminName.trim() || undefined,
+        adminEmail: adminEmail.trim(),
+      });
+      toast.success(`${hotelName.trim()} created — login details sent to ${adminEmail.trim()}`);
+      setHotelName("");
+      setAdminName("");
+      setAdminEmail("");
       onDone();
     } catch (e) {
       toast.error(String((e as Error).message));
@@ -122,10 +141,30 @@ function NewOrgCard({ onDone }: { onDone: () => void }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">New organisation</CardTitle></CardHeader>
-      <CardContent className="flex gap-2">
-        <Input placeholder="Hotel group name" value={name} onChange={(e) => setName(e.target.value)} />
-        <Button onClick={create} disabled={saving || !name.trim()}>{saving ? "Creating…" : "Create"}</Button>
+      <CardHeader>
+        <CardTitle className="text-base">New hotel</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Creates the hotel and emails the admin a link to set their password and sign in.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div>
+          <Label className="text-xs">Hotel name</Label>
+          <Input className="mt-1" placeholder="Cedar Inn" value={hotelName} onChange={(e) => setHotelName(e.target.value)} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label className="text-xs">Admin name</Label>
+            <Input className="mt-1" placeholder="Optional" value={adminName} onChange={(e) => setAdminName(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs">Admin email</Label>
+            <Input className="mt-1" type="email" placeholder="owner@cedarinn.com" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
+          </div>
+        </div>
+        <Button onClick={save} disabled={saving || !hotelName.trim() || !adminEmail.trim()}>
+          {saving ? "Saving…" : "Save & send login details"}
+        </Button>
       </CardContent>
     </Card>
   );
@@ -220,7 +259,7 @@ function OrgCard({ org, onDone }: { org: Org; onDone: () => void }) {
         )}
 
         <div className="flex gap-2">
-          <Input placeholder="admin@hotel.com" value={email} onChange={(e) => setEmail(e.target.value)} className="flex-1" />
+          <Input placeholder="Add another admin by email" value={email} onChange={(e) => setEmail(e.target.value)} className="flex-1" />
           <Button size="sm" variant="outline" onClick={addAdmin} disabled={addingAdmin || !email.trim()}>
             {addingAdmin ? "Adding…" : "Add admin"}
           </Button>
