@@ -60,6 +60,12 @@ export const Route = createFileRoute("/api/admin/invite-staff")({
         }
         if (!authorized) return new Response("Forbidden", { status: 403 });
 
+        // Seat cap per plan (PLAN_FEATURES.maxStaff in src/lib/billing.ts).
+        const { data: seatOk } = await supabaseAdmin.rpc("staff_seat_limit_ok", { _property_id: propertyId });
+        if (!seatOk) {
+          return new Response("Staff seat limit reached for the current plan. Upgrade to invite more.", { status: 403 });
+        }
+
         const appUrl = process.env.APP_URL ?? new URL(request.url).origin;
 
         const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
