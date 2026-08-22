@@ -66,8 +66,12 @@ export const Route = createFileRoute("/api/admin/customers")({
             const hotelName = String(body.hotelName ?? "").trim();
             const adminName = body.adminName ? String(body.adminName).trim() : undefined;
             const adminEmail = String(body.adminEmail ?? "").trim();
+            const planTier = body.planTier as PlanTier | "starter" | undefined;
             if (!hotelName) return bad("Hotel name required");
             if (!isValidEmail(adminEmail)) return bad("Invalid admin email");
+            if (planTier && planTier !== "starter" && planTier !== "growth" && planTier !== "pro") {
+              return bad("planTier must be starter, growth, or pro");
+            }
 
             const { data: org, error: orgErr } = await supabaseAdmin
               .from("organizations").insert({ name: hotelName }).select("id").single();
@@ -94,7 +98,29 @@ export const Route = createFileRoute("/api/admin/customers")({
               invited_by: uid,
             });
 
-            return ok({ orgId: org.id, propertyId: property.id });
+            // Starter needs no subscription row at all (its absence IS the
+            // Starter default — see org_has_plan_at_least). Only Growth/Pro
+            // create one, at 1 property since this is a brand-new hotel.
+            let amountPkr: number | undefined;
+            if (planTier === "growth" || planTier === "pro") {
+              const plan = PLAN_PRICING_PKR[planTier];
+              amountPkr = plan.monthlyPkr;
+              const periodEnd = new Date();
+              periodEnd.setDate(periodEnd.getDate() + 30);
+              const { error: subErr } = await supabaseAdmin.from("subscriptions").insert({
+                organization_id: org.id,
+                safepay_subscription_reference: `manual-${org.id}-${Date.now()}`,
+                safepay_plan_id: plan.planId,
+                plan_tier: planTier,
+                status: "active",
+                property_count: 1,
+                amount_pkr: amountPkr,
+                current_period_end: periodEnd.toISOString(),
+              });
+              if (subErr) return bad(subErr.message, 500);
+            }
+
+            return ok({ orgId: org.id, propertyId: property.id, amountPkr });
           }
 
           case "createOrg": {
