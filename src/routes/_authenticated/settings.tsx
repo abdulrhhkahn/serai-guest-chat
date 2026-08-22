@@ -383,25 +383,30 @@ function StaffCard({ propertyId }: { propertyId: string }) {
   const [fullName, setFullName] = useState("");
   const [inviting, setInviting] = useState(false);
 
-  const { data: staff } = useQuery({
+  const { data: plan } = usePlanTier(propertyId);
+  const maxStaff = plan?.proOk ? null : plan?.growthOk ? 5 : 2;
+
+  const { data } = useQuery({
     queryKey: ["property-staff", propertyId],
     queryFn: async () => {
-      const { data } = await supabase.from("staff_profiles").select("id, full_name").eq("property_id", propertyId);
-      return data ?? [];
+      const { data: s } = await supabase.auth.getSession();
+      const res = await fetch("/api/admin/property-staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
+        body: JSON.stringify({ propertyId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json() as Promise<{
+        staff: { id: string; full_name: string | null; email: string | null }[];
+        invites: { id: string; email: string; status: string; created_at: string }[];
+      }>;
     },
   });
 
-  const { data: invites } = useQuery({
-    queryKey: ["property-invites", propertyId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("staff_invites")
-        .select("id, email, status, created_at")
-        .eq("property_id", propertyId)
-        .order("created_at", { ascending: false });
-      return data ?? [];
-    },
-  });
+  const staff = data?.staff ?? [];
+  const invites = data?.invites ?? [];
+  const seatsUsed = staff.length + invites.length;
+  const atLimit = maxStaff !== null && seatsUsed >= maxStaff;
 
   async function invite() {
     if (!email.trim()) return;
@@ -411,7 +416,7 @@ function StaffCard({ propertyId }: { propertyId: string }) {
       toast.success(`Invite sent to ${email.trim()}`);
       setEmail("");
       setFullName("");
-      qc.invalidateQueries({ queryKey: ["property-invites", propertyId] });
+      qc.invalidateQueries({ queryKey: ["property-staff", propertyId] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to invite");
     } finally {
@@ -421,27 +426,28 @@ function StaffCard({ propertyId }: { propertyId: string }) {
 
   return (
     <Card className="p-5 space-y-4">
-      <div>
-        <h2 className="font-medium">Staff</h2>
-        <p className="text-sm text-muted-foreground">
-          Invite someone by email — they'll get a link from Supabase to set their password and land here directly, no shared demo account involved.
-        </p>
+      <div className="flex items-center justify-between">
+        <h2 className="font-medium">Invite Staff</h2>
+        {maxStaff !== null && (
+          <span className="text-xs text-muted-foreground">{seatsUsed} of {maxStaff} seats used</span>
+        )}
       </div>
 
-      {(staff?.length ?? 0) > 0 && (
+      {staff.length > 0 && (
         <ul className="text-sm space-y-1">
-          {staff!.map((s) => (
+          {staff.map((s) => (
             <li key={s.id} className="flex items-center gap-2">
-              <span>{s.full_name || "Unnamed"}</span>
+              <span className="font-medium">{s.full_name || "Unnamed"}</span>
+              {s.email && <span className="text-muted-foreground">— {s.email}</span>}
             </li>
           ))}
         </ul>
       )}
 
-      {(invites?.length ?? 0) > 0 && (
+      {invites.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Invites</p>
-          {invites!.map((inv) => (
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending</p>
+          {invites.map((inv) => (
             <div key={inv.id} className="flex items-center gap-2 text-sm">
               <span className="flex-1">{inv.email}</span>
               <span className="rounded-md bg-muted px-2 py-0.5 text-xs capitalize">{inv.status}</span>
@@ -450,17 +456,24 @@ function StaffCard({ propertyId }: { propertyId: string }) {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-        <div className="flex-1">
-          <Label>Full name</Label>
-          <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Optional" className="mt-1" />
+      {atLimit ? (
+        <p className="text-sm text-muted-foreground">
+          Staff seat limit reached for your current plan.{" "}
+          <a href="/billing" className="underline">Upgrade to invite more</a>.
+        </p>
+      ) : (
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+          <div className="flex-1">
+            <Label>Full name</Label>
+            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Optional" className="mt-1" />
+          </div>
+          <div className="flex-1">
+            <Label>Email</Label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="staff@hotel.com" className="mt-1" />
+          </div>
+          <Button onClick={invite} disabled={inviting || !email.trim()}>{inviting ? "Inviting…" : "Send invite"}</Button>
         </div>
-        <div className="flex-1">
-          <Label>Email</Label>
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="staff@hotel.com" className="mt-1" />
-        </div>
-        <Button onClick={invite} disabled={inviting || !email.trim()}>{inviting ? "Inviting…" : "Send invite"}</Button>
-      </div>
+      )}
     </Card>
   );
 }
