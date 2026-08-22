@@ -87,7 +87,7 @@ function AnalyticsPage() {
   // src/lib/billing.ts). Reuses the same "current-property" query key as
   // the authenticated layout (route.tsx) so this shares its cache instead
   // of firing a duplicate request.
-  const { data: myProperty } = useQuery({
+  const { data: myProperty, isLoading: myPropertyLoading, isError: myPropertyError } = useQuery({
     queryKey: ["current-property"],
     queryFn: async () => {
       const { data: prof } = await supabase.from("staff_profiles").select("property_id, full_name").maybeSingle();
@@ -476,10 +476,28 @@ function AnalyticsPage() {
     downloadCsv(`serai-summary-${from}_${to}.csv`, rows);
   }
 
-  // Gate the whole page behind Growth+ once we know (loading state shows
-  // nothing rather than flashing the paywall for properties that DO have
-  // access). A property with no org falls back to Starter and is blocked.
-  if (myProperty?.id && !planLoading && !analyticsPlanOk) {
+  // Fail closed, not open: while we don't yet know which property this
+  // account is on (still loading, or the lookup errored), show nothing
+  // rather than the full page — the earlier version skipped the gate
+  // entirely whenever myProperty hadn't resolved, which silently showed
+  // unrestricted Analytics to anyone whose property lookup was slow or
+  // failed. Only a confirmed Growth+ property gets through.
+  if (myPropertyLoading) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (myPropertyError || !myProperty?.id) {
+    return (
+      <div className="p-6 max-w-md">
+        <p className="text-sm text-muted-foreground">
+          Couldn't load your property. Try refreshing the page.
+        </p>
+      </div>
+    );
+  }
+  if (planLoading) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (!analyticsPlanOk) {
     return (
       <div className="p-6 max-w-2xl">
         <h1 className="font-serif text-3xl mb-2">Analytics</h1>
