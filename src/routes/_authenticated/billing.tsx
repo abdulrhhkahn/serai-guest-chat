@@ -38,23 +38,23 @@ async function startCheckout(orgId: string, tier: PlanTier) {
 function BillingPage() {
   const [redirecting, setRedirecting] = useState<PlanTier | null>(null);
 
-  // Same "which org does the current user administer" pattern as organization.tsx.
-  const { data: org, isLoading } = useQuery({
-    queryKey: ["my-org"],
+  // Informational data — which org (if any) does MY property belong to,
+  // and what's its current plan. Works for any staff member, regardless
+  // of whether they can manage billing.
+  const { data: myProperty, isLoading: propertyLoading } = useQuery({
+    queryKey: ["current-property"],
     queryFn: async () => {
       const { data: auth } = await supabase.auth.getUser();
-      const uid = auth.user?.id;
-      if (!uid) return null;
-      const { data: mem } = await supabase.from("org_admins").select("org_id").eq("user_id", uid).limit(1).maybeSingle();
-      if (!mem) return null;
-      const { data: o } = await supabase.from("organizations").select("id, name").eq("id", mem.org_id).maybeSingle();
-      return o;
+      const { data: prof } = await supabase.from("staff_profiles").select("property_id").eq("id", auth.user?.id ?? "").maybeSingle();
+      if (!prof?.property_id) return null;
+      const { data } = await supabase.from("properties").select("id, organization_id").eq("id", prof.property_id).maybeSingle();
+      return data;
     },
   });
 
-  const orgId = org?.id ?? "";
+  const orgId = myProperty?.organization_id ?? "";
 
-  const { data: subscription } = useQuery({
+  const { data: subscription, isLoading: subLoading } = useQuery({
     queryKey: ["subscription", orgId],
     enabled: !!orgId,
     queryFn: async () => {
@@ -62,6 +62,19 @@ function BillingPage() {
         .from("subscriptions").select("*").eq("organization_id", orgId)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       return data;
+    },
+  });
+
+  // Separately: am I actually allowed to manage billing for that org?
+  // Gates the Subscribe action only — pricing itself is always visible.
+  const { data: canManageBilling, isLoading: adminCheckLoading } = useQuery({
+    queryKey: ["is-org-admin", orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { data } = await supabase
+        .from("org_admins").select("user_id").eq("org_id", orgId).eq("user_id", auth.user?.id ?? "").maybeSingle();
+      return !!data;
     },
   });
 
@@ -80,12 +93,27 @@ function BillingPage() {
     }
   }
 
-  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
-  if (!org) {
+  if (propertyLoading || (!!orgId && (subLoading || adminCheckLoading))) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  }
+
+  // A property with no organisation at all (only the demo property, in
+  // practice) has nothing to subscribe — there's no admin to ask either,
+  // since there's no org for one to exist in.
+  if (!myProperty?.organization_id) {
     return (
-      <div className="p-6 max-w-2xl">
-        <h1 className="font-serif text-3xl mb-2">Billing</h1>
-        <p className="text-sm text-muted-foreground">You don't administer an organisation. Ask your account owner to add you as an org admin.</p>
+      <div className="p-6 max-w-2xl space-y-6">
+        <div className="flex items-center gap-2">
+          <CreditCard className="h-6 w-6" />
+          <h1 className="font-serif text-3xl">Billing</h1>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          This property isn't linked to an organisation yet, so it can't subscribe to a paid plan.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3 items-start">
+          <PlanCard tier="starter" isCurrent />
+          {(["growth", "pro"] as PlanTier[]).map((tier) => <PlanCard key={tier} tier={tier} isCurrent={false} />)}
+        </div>
       </div>
     );
   }
@@ -98,6 +126,7 @@ function BillingPage() {
       </div>
       <p className="text-sm text-muted-foreground">
         {isActive ? `Current plan: ${PLAN_PRICING_PKR[currentTier as PlanTier]?.label ?? "Starter"}` : "You're on the free Starter plan."}
+        {!canManageBilling && " Only your hotel's admin can change plans."}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-3 items-start">
@@ -107,8 +136,9 @@ function BillingPage() {
             key={tier}
             tier={tier}
             isCurrent={isActive && currentTier === tier}
-            onSubscribe={() => handleSubscribe(tier)}
+            onSubscribe={canManageBilling ? () => handleSubscribe(tier) : undefined}
             redirecting={redirecting === tier}
+            restrictedNote={canManageBilling ? undefined : "Ask your hotel's admin to upgrade"}
           />
         ))}
       </div>
@@ -121,11 +151,13 @@ function PlanCard({
   isCurrent,
   onSubscribe,
   redirecting,
+  restrictedNote,
 }: {
   tier: "starter" | PlanTier;
   isCurrent: boolean;
   onSubscribe?: () => void;
   redirecting?: boolean;
+  restrictedNote?: string;
 }) {
   const features = PLAN_FEATURES[tier];
   const pricing = tier === "starter" ? null : PLAN_PRICING_PKR[tier];
@@ -180,6 +212,9 @@ function PlanCard({
               or <a href={salesMailto(label)} className="underline">contact sales</a>
             </p>
           </div>
+        )}
+        {!onSubscribe && !isCurrent && restrictedNote && (
+          <p className="text-center text-xs text-muted-foreground">{restrictedNote}</p>
         )}
       </CardContent>
     </Card>
