@@ -189,7 +189,7 @@ function AuthedLayout() {
                       {p.id === property?.id && <Check className="h-3.5 w-3.5" />}
                     </DropdownMenuItem>
                   ))}
-                  {(isAdmin || orgCanAddProperty) && (
+                  {orgCanAddProperty && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => setCreating(true)}>
