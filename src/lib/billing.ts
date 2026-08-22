@@ -1,4 +1,4 @@
-export type PlanTier = "growth" | "pro"; // Starter stays free/unbilled
+export type PlanTier = "growth" | "pro"; // Basic stays free/unbilled
 
 // Create these in the Safepay dashboard (Developer > Plans) first, then
 // paste the real plan_xxx IDs here.
@@ -14,7 +14,7 @@ export function tierFromPlanId(planId: string): PlanTier {
 }
 
 export const PLAN_FEATURES: Record<
-  "starter" | PlanTier,
+  "basic" | PlanTier,
   {
     channels: ("web" | "sms" | "whatsapp")[];
     aiAutonomy: "suggest" | "approve_all" | "auto";
@@ -23,16 +23,18 @@ export const PLAN_FEATURES: Record<
     orgRollup: boolean;
     maxConversationsPerMonth: number | null;
     maxStaff: number | null;
+    mobileCheckin: boolean;
   }
 > = {
-  starter: {
+  basic: {
     channels: ["web"],
     aiAutonomy: "suggest",
     analytics: false,
     weeklyDigest: false,
     orgRollup: false,
-    maxConversationsPerMonth: 50,
+    maxConversationsPerMonth: 25,
     maxStaff: 2,
+    mobileCheckin: true,
   },
   growth: {
     channels: ["web", "sms", "whatsapp"],
@@ -40,8 +42,9 @@ export const PLAN_FEATURES: Record<
     analytics: true,
     weeklyDigest: true,
     orgRollup: false,
-    maxConversationsPerMonth: null,
+    maxConversationsPerMonth: 50,
     maxStaff: 5,
+    mobileCheckin: true,
   },
   pro: {
     channels: ["web", "sms", "whatsapp"],
@@ -51,5 +54,6 @@ export const PLAN_FEATURES: Record<
     orgRollup: true,
     maxConversationsPerMonth: null,
     maxStaff: null,
+    mobileCheckin: true,
   },
 };
