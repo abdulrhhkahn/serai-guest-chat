@@ -115,22 +115,29 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
   const [hotelName, setHotelName] = useState("");
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
+  const [planTier, setPlanTier] = useState<"starter" | PlanTier>("starter");
   const [saving, setSaving] = useState(false);
 
   async function save() {
     if (!hotelName.trim() || !adminEmail.trim()) return;
     setSaving(true);
     try {
-      await callAdmin({
+      const res = await callAdmin({
         action: "createHotel",
         hotelName: hotelName.trim(),
         adminName: adminName.trim() || undefined,
         adminEmail: adminEmail.trim(),
+        planTier,
       });
-      toast.success(`${hotelName.trim()} created — login details sent to ${adminEmail.trim()}`);
+      toast.success(
+        res.amountPkr
+          ? `${hotelName.trim()} created on ${planTier} (PKR ${res.amountPkr.toLocaleString()}/mo) — login details sent to ${adminEmail.trim()}`
+          : `${hotelName.trim()} created — login details sent to ${adminEmail.trim()}`,
+      );
       setHotelName("");
       setAdminName("");
       setAdminEmail("");
+      setPlanTier("starter");
       onDone();
     } catch (e) {
       toast.error(String((e as Error).message));
@@ -161,6 +168,17 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
             <Label className="text-xs">Admin email</Label>
             <Input className="mt-1" type="email" placeholder="owner@cedarinn.com" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
           </div>
+        </div>
+        <div>
+          <Label className="text-xs">Plan</Label>
+          <Select value={planTier} onValueChange={(v) => setPlanTier(v as "starter" | PlanTier)}>
+            <SelectTrigger className="mt-1 w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="starter">Starter (free)</SelectItem>
+              <SelectItem value="growth">Growth</SelectItem>
+              <SelectItem value="pro">Pro</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <Button onClick={save} disabled={saving || !hotelName.trim() || !adminEmail.trim()}>
           {saving ? "Saving…" : "Save & send login details"}
