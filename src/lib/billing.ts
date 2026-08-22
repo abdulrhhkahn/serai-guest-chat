@@ -22,6 +22,7 @@ export const PLAN_FEATURES: Record<
     weeklyDigest: boolean;
     orgRollup: boolean;
     maxConversationsPerMonth: number | null;
+    maxStaff: number | null;
   }
 > = {
   starter: {
@@ -31,6 +32,7 @@ export const PLAN_FEATURES: Record<
     weeklyDigest: false,
     orgRollup: false,
     maxConversationsPerMonth: 50,
+    maxStaff: 2,
   },
   growth: {
     channels: ["web", "sms", "whatsapp"],
@@ -39,6 +41,7 @@ export const PLAN_FEATURES: Record<
     weeklyDigest: true,
     orgRollup: false,
     maxConversationsPerMonth: null,
+    maxStaff: 5,
   },
   pro: {
     channels: ["web", "sms", "whatsapp"],
@@ -47,5 +50,6 @@ export const PLAN_FEATURES: Record<
     weeklyDigest: true,
     orgRollup: true,
     maxConversationsPerMonth: null,
+    maxStaff: null,
   },
 };
