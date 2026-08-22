@@ -66,11 +66,11 @@ export const Route = createFileRoute("/api/admin/customers")({
             const hotelName = String(body.hotelName ?? "").trim();
             const adminName = body.adminName ? String(body.adminName).trim() : undefined;
             const adminEmail = String(body.adminEmail ?? "").trim();
-            const planTier = body.planTier as PlanTier | "starter" | undefined;
+            const planTier = body.planTier as PlanTier | "basic" | undefined;
             if (!hotelName) return bad("Hotel name required");
             if (!isValidEmail(adminEmail)) return bad("Invalid admin email");
-            if (planTier && planTier !== "starter" && planTier !== "growth" && planTier !== "pro") {
-              return bad("planTier must be starter, growth, or pro");
+            if (planTier && planTier !== "basic" && planTier !== "growth" && planTier !== "pro") {
+              return bad("planTier must be basic, growth, or pro");
             }
 
             const { data: org, error: orgErr } = await supabaseAdmin
