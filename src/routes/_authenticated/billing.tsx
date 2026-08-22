@@ -2,11 +2,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CreditCard } from "lucide-react";
+import {
+  DollarSign,
+  MessageSquare,
+  Bot,
+  BarChart3,
+  LineChart,
+  Mail,
+  Building2,
+  QrCode,
+} from "lucide-react";
 import { PLAN_FEATURES, PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
 
 export const Route = createFileRoute("/_authenticated/billing")({
@@ -22,6 +31,12 @@ const AUTONOMY_COPY: Record<string, string> = {
   suggest: "AI suggests replies, staff sends every message",
   approve_all: "AI drafts replies, staff approves before sending",
   auto: "AI auto-sends on trusted topics, staff handles the rest",
+};
+
+const TIER_DESCRIPTION: Record<"basic" | PlanTier, string> = {
+  basic: "Get started with in app web chat and essential guest messaging.",
+  growth: "Reach guests on every channel with smarter AI assistance.",
+  pro: "Full automation and multi-property control for growing portfolios.",
 };
 
 async function startCheckout(orgId: string, tier: PlanTier) {
@@ -78,7 +93,7 @@ function BillingPage() {
     },
   });
 
-  const currentTier = (subscription?.plan_tier as PlanTier | "starter") ?? "starter";
+  const currentTier = (subscription?.plan_tier as PlanTier | "basic") ?? "basic";
   const isActive = subscription?.status === "active";
 
   async function handleSubscribe(tier: PlanTier) {
@@ -97,52 +112,65 @@ function BillingPage() {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   }
 
-  // A property with no organisation at all (only the demo property, in
-  // practice) has nothing to subscribe — there's no admin to ask either,
-  // since there's no org for one to exist in.
-  if (!myProperty?.organization_id) {
-    return (
-      <div className="p-6 max-w-2xl space-y-6">
-        <div className="flex items-center gap-2">
-          <CreditCard className="h-6 w-6" />
-          <h1 className="font-serif text-3xl">Billing</h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          This property isn't linked to an organisation yet, so it can't subscribe to a paid plan.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-3 items-start">
-          <PlanCard tier="starter" isCurrent />
-          {(["growth", "pro"] as PlanTier[]).map((tier) => <PlanCard key={tier} tier={tier} isCurrent={false} />)}
-        </div>
-      </div>
-    );
-  }
+  const noOrg = !myProperty?.organization_id;
 
   return (
-    <div className="p-6 max-w-3xl space-y-6">
-      <div className="flex items-center gap-2">
-        <CreditCard className="h-6 w-6" />
-        <h1 className="font-serif text-3xl">Billing</h1>
+    <div className="p-6 max-w-5xl mx-auto space-y-8">
+      <div className="flex flex-col items-center text-center gap-2">
+        <div className="h-10 w-10 rounded-full border border-border flex items-center justify-center">
+          <DollarSign className="h-5 w-5 text-brand" />
+        </div>
+        <p className="text-xs font-medium tracking-widest uppercase text-muted-foreground">Pricing</p>
+        <h1 className="font-serif text-3xl sm:text-4xl">Choose the Perfect Plan for Your Needs</h1>
+        {noOrg ? (
+          <p className="text-sm text-muted-foreground mt-1">
+            This property isn't linked to an organisation yet, so it can't subscribe to a paid plan.
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground mt-1">
+            {isActive ? `Current plan: ${PLAN_PRICING_PKR[currentTier as PlanTier]?.label ?? "Basic"}` : "You're on the free Basic plan."}
+            {!canManageBilling && " Only your hotel's admin can change plans."}
+          </p>
+        )}
       </div>
-      <p className="text-sm text-muted-foreground">
-        {isActive ? `Current plan: ${PLAN_PRICING_PKR[currentTier as PlanTier]?.label ?? "Starter"}` : "You're on the free Starter plan."}
-        {!canManageBilling && " Only your hotel's admin can change plans."}
-      </p>
 
-      <div className="grid gap-4 sm:grid-cols-3 items-start">
-        <PlanCard tier="starter" isCurrent={!isActive} />
+      <div className="grid gap-4 sm:grid-cols-3 items-stretch">
+        <PlanCard tier="basic" isCurrent={noOrg || !isActive} />
         {(["growth", "pro"] as PlanTier[]).map((tier) => (
           <PlanCard
             key={tier}
             tier={tier}
-            isCurrent={isActive && currentTier === tier}
-            onSubscribe={canManageBilling ? () => handleSubscribe(tier) : undefined}
+            isCurrent={!noOrg && isActive && currentTier === tier}
+            onSubscribe={!noOrg && canManageBilling ? () => handleSubscribe(tier) : undefined}
             redirecting={redirecting === tier}
-            restrictedNote={canManageBilling ? undefined : "Ask your hotel's admin to upgrade"}
+            restrictedNote={!noOrg && !canManageBilling ? "Ask your hotel's admin to upgrade" : undefined}
           />
         ))}
       </div>
     </div>
+  );
+}
+
+const FEATURE_ICON = {
+  channels: MessageSquare,
+  ai: Bot,
+  conversations: BarChart3,
+  analytics: LineChart,
+  digest: Mail,
+  multiProperty: Building2,
+  checkin: QrCode,
+} as const;
+
+function FeatureRow({ icon, label, value }: { icon: keyof typeof FEATURE_ICON; label: string; value: string }) {
+  const IconComp = FEATURE_ICON[icon];
+  return (
+    <li className="flex items-start gap-2.5">
+      <IconComp className="h-4 w-4 text-brand shrink-0 mt-0.5" />
+      <span className="text-sm text-muted-foreground">
+        <span className="font-medium text-foreground">{label} — </span>
+        {value}
+      </span>
+    </li>
   );
 }
 
@@ -153,69 +181,79 @@ function PlanCard({
   redirecting,
   restrictedNote,
 }: {
-  tier: "starter" | PlanTier;
+  tier: "basic" | PlanTier;
   isCurrent: boolean;
   onSubscribe?: () => void;
   redirecting?: boolean;
   restrictedNote?: string;
 }) {
   const features = PLAN_FEATURES[tier];
-  const pricing = tier === "starter" ? null : PLAN_PRICING_PKR[tier];
-  const label = pricing?.label ?? "Starter";
+  const pricing = tier === "basic" ? null : PLAN_PRICING_PKR[tier];
+  const label = pricing?.label ?? "Basic";
+  const isPopular = tier === "growth";
 
   return (
-    <Card className={isCurrent ? "border-primary" : undefined}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>{label}</CardTitle>
+    <Card className={`relative h-full flex flex-col ${isCurrent ? "border-primary" : ""}`}>
+      {isPopular && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+          <span className="rounded-full bg-brand text-brand-foreground text-xs font-medium px-3 py-1 whitespace-nowrap">
+            Most popular
+          </span>
+        </div>
+      )}
+      <CardHeader className="space-y-1">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-3xl font-bold">
+            {pricing ? `PKR ${pricing.monthlyPkr.toLocaleString()}` : "Free"}
+            {pricing && <span className="text-sm font-normal text-muted-foreground">/mo</span>}
+          </p>
           {isCurrent && <Badge>Current</Badge>}
         </div>
-        <p className="text-2xl font-semibold">
-          {pricing ? `PKR ${pricing.monthlyPkr.toLocaleString()}/mo` : "Free"}
-        </p>
-        {pricing && <p className="text-xs text-muted-foreground">per property, billed monthly</p>}
+        <p className="text-brand font-medium">{label}</p>
+        <p className="text-sm text-muted-foreground">{TIER_DESCRIPTION[tier]}</p>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <ul className="text-sm space-y-2.5 text-muted-foreground">
-          <li>
-            <span className="font-medium text-foreground">Channels — </span>
-            {features.channels.map((c) => (c === "web" ? "Web chat" : c === "sms" ? "SMS" : "WhatsApp")).join(", ")}
-          </li>
-          <li>
-            <span className="font-medium text-foreground">AI behaviour — </span>
-            {AUTONOMY_COPY[features.aiAutonomy]}
-          </li>
-          <li>
-            <span className="font-medium text-foreground">Conversations/month — </span>
-            {features.maxConversationsPerMonth ?? "Unlimited"}
-          </li>
-          <li>
-            <span className="font-medium text-foreground">Analytics — </span>
-            {features.analytics ? "Reply mix, containment, wait times, CSAT" : "Not included"}
-          </li>
-          <li>
-            <span className="font-medium text-foreground">Weekly email digest — </span>
-            {features.weeklyDigest ? "Included" : "Not included"}
-          </li>
-          <li>
-            <span className="font-medium text-foreground">Multi-property — </span>
-            {features.orgRollup ? "Add properties, cross-property comparison" : "Single property"}
-          </li>
+
+      <div className="border-t border-border" />
+
+      <CardContent className="flex flex-col flex-1 pt-5">
+        <ul className="space-y-3 flex-1">
+          <FeatureRow
+            icon="channels"
+            label="Channels"
+            value={features.channels.map((c) => (c === "web" ? "In app web chat" : c === "sms" ? "SMS" : "WhatsApp")).join(", ")}
+          />
+          <FeatureRow icon="ai" label="AI behaviour" value={AUTONOMY_COPY[features.aiAutonomy]} />
+          <FeatureRow
+            icon="conversations"
+            label="Conversations/month"
+            value={features.maxConversationsPerMonth ? String(features.maxConversationsPerMonth) : "Unlimited"}
+          />
+          <FeatureRow icon="analytics" label="Analytics" value={features.analytics ? "Reply mix, containment, wait times, CSAT" : "Not included"} />
+          <FeatureRow icon="digest" label="Weekly email digest" value={features.weeklyDigest ? "Included" : "Not included"} />
+          <FeatureRow
+            icon="multiProperty"
+            label="Multi-property"
+            value={features.orgRollup ? "Add properties, cross-property comparison" : "Single property"}
+          />
+          <FeatureRow icon="checkin" label="Mobile check-in" value="QR code check-in for guests" />
         </ul>
 
-        {onSubscribe && !isCurrent && (
-          <div className="space-y-2">
+        <div className="mt-6 space-y-2">
+          {onSubscribe && !isCurrent ? (
             <Button className="w-full" onClick={onSubscribe} disabled={redirecting}>
               {redirecting ? "Redirecting…" : "Subscribe"}
             </Button>
+          ) : (
+            <Button className="w-full" variant={isCurrent ? "outline" : "default"} disabled>
+              {isCurrent ? "Current plan" : "Subscribe"}
+            </Button>
+          )}
+          {!isCurrent && (
             <p className="text-center text-xs text-muted-foreground">
-              or <a href={salesMailto(label)} className="underline">contact sales</a>
+              {restrictedNote ?? <>or <a href={salesMailto(label)} className="underline">contact sales</a></>}
             </p>
-          </div>
-        )}
-        {!onSubscribe && !isCurrent && restrictedNote && (
-          <p className="text-center text-xs text-muted-foreground">{restrictedNote}</p>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   );
