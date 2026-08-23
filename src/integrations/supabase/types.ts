@@ -567,6 +567,48 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_interest_leads: {
+        Row: {
+          created_at: string
+          first_name: string
+          heard_about: string | null
+          id: string
+          last_name: string
+          phone: string
+          plan_tier: string
+          property_count: number
+          property_type: string
+          submitted_by: string | null
+          work_email: string
+        }
+        Insert: {
+          created_at?: string
+          first_name: string
+          heard_about?: string | null
+          id?: string
+          last_name: string
+          phone: string
+          plan_tier: string
+          property_count: number
+          property_type: string
+          submitted_by?: string | null
+          work_email: string
+        }
+        Update: {
+          created_at?: string
+          first_name?: string
+          heard_about?: string | null
+          id?: string
+          last_name?: string
+          phone?: string
+          plan_tier?: string
+          property_count?: number
+          property_type?: string
+          submitted_by?: string | null
+          work_email?: string
+        }
+        Relationships: []
+      }
       properties: {
         Row: {
           address: string | null
