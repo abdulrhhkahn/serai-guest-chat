@@ -309,7 +309,7 @@ function MessagingNumbersCard({ propertyId }: { propertyId: string }) {
     },
   });
 
-  const [channel, setChannel] = useState("sms");
+  const [channel, setChannel] = useState("whatsapp");
   const [phone, setPhone] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -349,7 +349,6 @@ function MessagingNumbersCard({ propertyId }: { propertyId: string }) {
         <h2 className="font-medium">Messaging numbers</h2>
         <p className="text-sm text-muted-foreground">
           Connect a Twilio SMS or WhatsApp number so guests can text you and replies go back out the same channel.
-          Point that number's webhook at <span className="font-mono text-xs">/api/webhooks/twilio</span>.
         </p>
       </div>
 
@@ -368,14 +367,13 @@ function MessagingNumbersCard({ propertyId }: { propertyId: string }) {
       <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
         <div>
           <Label>Channel</Label>
-          <select value={channel} onChange={(e) => setChannel(e.target.value)} className="mt-1 h-10 w-full sm:w-32 rounded-md border border-border bg-background px-3 text-sm">
+          <select value={channel} onChange={(e) => setChannel(e.target.value)} className="mt-2 h-10 w-full sm:w-32 rounded-md border border-border bg-background px-3 text-sm">
             <option value="sms">SMS</option>
             <option value="whatsapp">WhatsApp</option>
           </select>
         </div>
         <div className="flex-1">
-          <Label>Number (E.164)</Label>
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+14155551234" className="mt-1" />
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+14155551234" />
         </div>
         <Button onClick={add} disabled={adding}>{adding ? "Adding…" : "Add"}</Button>
       </div>
