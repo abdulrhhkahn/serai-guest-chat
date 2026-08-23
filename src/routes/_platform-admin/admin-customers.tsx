@@ -51,24 +51,8 @@ function CustomersAdminPage() {
   const { data: orgs, refetch: refetchOrgs } = useQuery({
     queryKey: ["all-orgs-with-subs"],
     queryFn: async (): Promise<Org[]> => {
-      const { data: orgRows } = await supabase.from("organizations").select("id, name").order("name");
-      const { data: propRows } = await supabase.from("properties").select("id, name, organization_id").not("organization_id", "is", null);
-      const { data: subRows } = await supabase
-        .from("subscriptions")
-        .select("organization_id, plan_tier, status, property_count, current_period_end")
-        .order("created_at", { ascending: false });
-
-      const latestSubByOrg = new Map<string, Org["subscription"]>();
-      for (const s of subRows ?? []) {
-        if (!latestSubByOrg.has(s.organization_id)) latestSubByOrg.set(s.organization_id, s);
-      }
-
-      return (orgRows ?? []).map((o) => ({
-        id: o.id,
-        name: o.name,
-        properties: (propRows ?? []).filter((p) => p.organization_id === o.id).map((p) => ({ id: p.id, name: p.name })),
-        subscription: latestSubByOrg.get(o.id) ?? null,
-      }));
+      const res = await callAdmin({ action: "listOrgs" });
+      return res.orgs;
     },
   });
 
