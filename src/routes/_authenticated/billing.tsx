@@ -122,16 +122,10 @@ function BillingPage() {
         </div>
         <p className="text-xs font-medium tracking-widest uppercase text-muted-foreground">Pricing</p>
         <h1 className="font-serif text-3xl sm:text-4xl">Choose the Perfect Plan for Your Needs</h1>
-        {noOrg ? (
-          <p className="text-sm text-muted-foreground mt-1">
-            This property isn't linked to an organisation yet, so it can't subscribe to a paid plan.
-          </p>
-        ) : (
-          <p className="text-sm text-muted-foreground mt-1">
-            {isActive ? `Current plan: ${PLAN_PRICING_PKR[currentTier as PlanTier]?.label ?? "Basic"}` : "You're on the free Basic plan."}
-            {!canManageBilling && " Only your hotel's admin can change plans."}
-          </p>
-        )}
+        <p className="text-sm text-muted-foreground mt-1">
+          {isActive ? `Current plan: ${PLAN_PRICING_PKR[currentTier as PlanTier]?.label ?? "Basic"}` : "You're on the free Basic plan."}
+          {!noOrg && !canManageBilling && " Only your hotel's admin can change plans."}
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3 items-stretch">
@@ -193,7 +187,7 @@ function PlanCard({
   const isPopular = tier === "growth";
 
   return (
-    <Card className={`relative h-full flex flex-col ${isCurrent ? "border-primary" : ""}`}>
+    <Card className={`relative h-full flex flex-col ${tier === "growth" ? "border-primary" : ""}`}>
       {isPopular && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
           <span className="rounded-full bg-brand text-brand-foreground text-xs font-medium px-3 py-1 whitespace-nowrap">
@@ -217,6 +211,7 @@ function PlanCard({
 
       <CardContent className="flex flex-col flex-1 pt-5">
         <ul className="space-y-3 flex-1">
+          <FeatureRow icon="checkin" label="Mobile check-in" value="QR code check-in for guests" />
           <FeatureRow
             icon="channels"
             label="Channels"
@@ -232,10 +227,9 @@ function PlanCard({
           <FeatureRow icon="digest" label="Weekly email digest" value={features.weeklyDigest ? "Included" : "Not included"} />
           <FeatureRow
             icon="multiProperty"
-            label="Multi-property"
+            label={features.orgRollup ? "Multi-property" : "Property type"}
             value={features.orgRollup ? "Add properties, cross-property comparison" : "Single property"}
           />
-          <FeatureRow icon="checkin" label="Mobile check-in" value="QR code check-in for guests" />
         </ul>
 
         <div className="mt-6 space-y-2">
