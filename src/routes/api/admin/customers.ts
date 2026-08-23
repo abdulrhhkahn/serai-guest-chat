@@ -43,7 +43,16 @@ export const Route = createFileRoute("/api/admin/customers")({
         // already used to gate cross-property actions elsewhere.
         const { data: roles } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", uid);
         const isPlatformAdmin = (roles ?? []).some((r) => r.role === "admin");
-        if (!isPlatformAdmin) return new Response("Forbidden", { status: 403 });
+        if (!isPlatformAdmin) {
+          // Temporary diagnostic detail in the response itself — shows up
+          // directly in the UI's error toast, no log-digging needed. Safe
+          // to leave briefly since this route is already role+passphrase
+          // gated; remove once the mismatch is understood.
+          return new Response(
+            `Forbidden (uid: ${uid}, roles found: ${JSON.stringify(roles)}, rolesError: ${JSON.stringify((await supabaseAdmin.from("user_roles").select("*").eq("user_id", uid)).error)})`,
+            { status: 403 },
+          );
+        }
 
         let body: Record<string, unknown>;
         try { body = await request.json(); } catch { return new Response("Bad request", { status: 400 }); }
