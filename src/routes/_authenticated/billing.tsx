@@ -5,6 +5,11 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { GuestTurnstile } from "@/components/GuestTurnstile";
 import { toast } from "sonner";
 import {
   DollarSign,
@@ -22,11 +27,6 @@ import { PLAN_FEATURES, PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
 export const Route = createFileRoute("/_authenticated/billing")({
   component: BillingPage,
 });
-
-// TODO: replace with your real sales contact.
-const SALES_EMAIL = "sales@serai.app";
-const salesMailto = (tier: string) =>
-  `mailto:${SALES_EMAIL}?subject=${encodeURIComponent(`Serai ${tier} plan — question before subscribing`)}`;
 
 const AUTONOMY_COPY: Record<string, string> = {
   suggest: "AI suggests replies, staff sends every message",
@@ -53,6 +53,7 @@ async function startCheckout(orgId: string, tier: PlanTier) {
 
 function BillingPage() {
   const [redirecting, setRedirecting] = useState<PlanTier | null>(null);
+  const [leadFormTier, setLeadFormTier] = useState<PlanTier | null>(null);
 
   // Informational data — which org (if any) does MY property belong to,
   // and what's its current plan. Works for any staff member, regardless
@@ -82,7 +83,8 @@ function BillingPage() {
   });
 
   // Separately: am I actually allowed to manage billing for that org?
-  // Gates the Subscribe action only — pricing itself is always visible.
+  // Gates the Subscribe/Buy now actions only — pricing itself is always
+  // visible.
   const { data: canManageBilling, isLoading: adminCheckLoading } = useQuery({
     queryKey: ["is-org-admin", orgId],
     enabled: !!orgId,
@@ -136,12 +138,20 @@ function BillingPage() {
             key={tier}
             tier={tier}
             isCurrent={!noOrg && isActive && currentTier === tier}
-            onSubscribe={!noOrg && canManageBilling ? () => handleSubscribe(tier) : undefined}
+            onSubscribe={!noOrg && canManageBilling ? () => setLeadFormTier(tier) : undefined}
+            onBuyNow={!noOrg && canManageBilling ? () => handleSubscribe(tier) : undefined}
             redirecting={redirecting === tier}
             restrictedNote={!noOrg && !canManageBilling ? "Ask your hotel's admin to upgrade" : undefined}
           />
         ))}
       </div>
+
+      {/* Subscribe just captures the lead and closes — it does NOT proceed
+          to checkout on its own. "or buy now" on the card is the only path
+          that goes straight to Safepay. */}
+      {leadFormTier && orgId && (
+        <SubscribeLeadForm tier={leadFormTier} onClose={() => setLeadFormTier(null)} />
+      )}
     </div>
   );
 }
@@ -170,16 +180,145 @@ function FeatureRow({ icon, label, value }: { icon: keyof typeof FEATURE_ICON; l
   );
 }
 
+const PROPERTY_TYPES = ["Hotel", "Guesthouse", "Bed & Breakfast", "Resort", "Serviced Apartments", "Other"];
+const HEARD_ABOUT_OPTIONS = ["Google Search", "Social Media", "Referral", "Industry Event", "Other"];
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
+
+function SubscribeLeadForm({
+  tier,
+  onClose,
+}: {
+  tier: PlanTier;
+  onClose: () => void;
+}) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [workEmail, setWorkEmail] = useState("");
+  const [propertyType, setPropertyType] = useState("");
+  const [propertyCount, setPropertyCount] = useState("");
+  const [phone, setPhone] = useState("");
+  const [heardAbout, setHeardAbout] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const propertyCountNum = Number(propertyCount);
+  const isValid =
+    firstName.trim() &&
+    lastName.trim() &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(workEmail.trim()) &&
+    propertyType &&
+    propertyCount.trim() &&
+    Number.isFinite(propertyCountNum) &&
+    propertyCountNum > 0 &&
+    phone.trim() &&
+    (!TURNSTILE_SITE_KEY || captchaToken);
+
+  // Submitting is the entire action — it saves the lead and closes the
+  // dialog. It deliberately does NOT continue on to Safepay checkout;
+  // "or buy now" on the card is the only path that does that.
+  //
+  // While submitting: every field, the Select triggers, the Cancel button,
+  // and backdrop-click/Escape (via onOpenChange below) are all disabled —
+  // no way to edit or close mid-flight and leave a half-finished insert.
+  async function submit() {
+    if (!isValid || submitting) return;
+    setSubmitting(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await supabase.from("plan_interest_leads").insert({
+        submitted_by: auth.user?.id,
+        plan_tier: tier,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        work_email: workEmail.trim(),
+        property_type: propertyType,
+        property_count: propertyCountNum,
+        phone: phone.trim(),
+        heard_about: heardAbout || null,
+      });
+      if (error) throw error;
+      toast.success("Thanks — we'll be in touch shortly.");
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't submit the form");
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && !submitting && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Subscribe to {PLAN_PRICING_PKR[tier].label}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">First name</Label>
+              <Input className="mt-1" value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={submitting} />
+            </div>
+            <div>
+              <Label className="text-xs">Last name</Label>
+              <Input className="mt-1" value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={submitting} />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Work email</Label>
+            <Input className="mt-1" type="email" value={workEmail} onChange={(e) => setWorkEmail(e.target.value)} disabled={submitting} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Property type</Label>
+              <Select value={propertyType} onValueChange={setPropertyType} disabled={submitting}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  {PROPERTY_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Properties (number)</Label>
+              <Input className="mt-1" type="number" min={1} value={propertyCount} onChange={(e) => setPropertyCount(e.target.value)} disabled={submitting} />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Phone</Label>
+            <Input className="mt-1" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={submitting} />
+          </div>
+          <div>
+            <Label className="text-xs">Where did you hear about us? (optional)</Label>
+            <Select value={heardAbout} onValueChange={setHeardAbout} disabled={submitting}>
+              <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
+              <SelectContent>
+                {HEARD_ABOUT_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <GuestTurnstile onToken={setCaptchaToken} />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>
+          <Button onClick={submit} disabled={!isValid || submitting}>
+            {submitting ? "Submitting…" : "Submit"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function PlanCard({
   tier,
   isCurrent,
   onSubscribe,
+  onBuyNow,
   redirecting,
   restrictedNote,
 }: {
   tier: "basic" | PlanTier;
   isCurrent: boolean;
   onSubscribe?: () => void;
+  onBuyNow?: () => void;
   redirecting?: boolean;
   restrictedNote?: string;
 }) {
@@ -251,7 +390,9 @@ function PlanCard({
           )}
           {!isCurrent && (
             <p className="text-center text-xs text-muted-foreground">
-              {restrictedNote ?? <>or <a href={salesMailto(label)} className="underline">contact sales</a></>}
+              {restrictedNote ?? (onBuyNow ? (
+                <>or <button type="button" onClick={onBuyNow} disabled={redirecting} className="underline">buy now</button></>
+              ) : null)}
             </p>
           )}
         </div>
