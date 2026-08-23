@@ -214,6 +214,40 @@ export const Route = createFileRoute("/api/admin/customers")({
             return ok({ orgs });
           }
 
+          // Full detail for one org — the "click a hotel, see everything"
+          // view. Includes admin emails, which listOrgs above doesn't
+          // fetch (email lookups are per-user Admin API calls, wasteful
+          // to do for every org in the table view).
+          case "orgDetail": {
+            const orgId = String(body.orgId ?? "");
+            if (!orgId) return bad("Missing orgId");
+
+            const { data: org, error: orgErr } = await supabaseAdmin.from("organizations").select("id, name").eq("id", orgId).maybeSingle();
+            if (orgErr) return bad(orgErr.message, 500);
+            if (!org) return bad("Not found", 404);
+
+            const { data: properties } = await supabaseAdmin.from("properties").select("id, name, slug, created_at").eq("organization_id", orgId).order("name");
+
+            const { data: sub } = await supabaseAdmin
+              .from("subscriptions").select("*").eq("organization_id", orgId)
+              .order("created_at", { ascending: false }).limit(1).maybeSingle();
+
+            const { data: adminRows } = await supabaseAdmin.from("org_admins").select("user_id, created_at").eq("org_id", orgId);
+            const admins = await Promise.all(
+              (adminRows ?? []).map(async (a) => {
+                const { data } = await supabaseAdmin.auth.admin.getUserById(a.user_id);
+                return { id: a.user_id, email: data?.user?.email ?? null, addedAt: a.created_at };
+              }),
+            );
+
+            return ok({
+              org,
+              properties: properties ?? [],
+              subscription: sub ?? null,
+              admins,
+            });
+          }
+
           default:
             return bad("Unknown action");
         }
