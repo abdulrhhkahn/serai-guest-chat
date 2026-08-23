@@ -176,6 +176,44 @@ export const Route = createFileRoute("/api/admin/customers")({
             return error ? bad(error.message, 500) : ok({ amountPkr, periodEnd: periodEnd.toISOString() });
           }
 
+          // Reads every org with its properties and latest subscription,
+          // via the service-role client — the browser's own Supabase
+          // client can't do this itself, since organizations/subscriptions
+          // RLS only lets a user read orgs THEY personally administer, and
+          // the site admin isn't added as an org_admin of every hotel they
+          // onboard on a customer's behalf.
+          case "listOrgs": {
+            const { data: orgRows, error: orgErr } = await supabaseAdmin.from("organizations").select("id, name").order("name");
+            if (orgErr) return bad(orgErr.message, 500);
+
+            const { data: propRows, error: propErr } = await supabaseAdmin
+              .from("properties")
+              .select("id, name, organization_id")
+              .not("organization_id", "is", null);
+            if (propErr) return bad(propErr.message, 500);
+
+            const { data: subRows, error: subErr } = await supabaseAdmin
+              .from("subscriptions")
+              .select("organization_id, plan_tier, status, property_count, current_period_end")
+              .order("created_at", { ascending: false });
+            if (subErr) return bad(subErr.message, 500);
+
+            const latestSubByOrg = new Map<string, (typeof subRows)[number]>();
+            for (const s of subRows ?? []) {
+              if (!latestSubByOrg.has(s.organization_id)) latestSubByOrg.set(s.organization_id, s);
+            }
+
+            const orgs = (orgRows ?? []).map((o) => ({
+              id: o.id,
+              name: o.name,
+              properties: (propRows ?? [])
+                .filter((p) => p.organization_id === o.id)
+                .map((p) => ({ id: p.id, name: p.name })),
+              subscription: latestSubByOrg.get(o.id) ?? null,
+            }));
+            return ok({ orgs });
+          }
+
           default:
             return bad("Unknown action");
         }
