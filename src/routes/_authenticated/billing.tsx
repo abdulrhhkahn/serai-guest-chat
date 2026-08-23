@@ -15,6 +15,7 @@ import {
   Mail,
   Building2,
   QrCode,
+  Users,
 } from "lucide-react";
 import { PLAN_FEATURES, PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
 
@@ -153,6 +154,7 @@ const FEATURE_ICON = {
   digest: Mail,
   multiProperty: Building2,
   checkin: QrCode,
+  seats: Users,
 } as const;
 
 function FeatureRow({ icon, label, value }: { icon: keyof typeof FEATURE_ICON; label: string; value: string }) {
@@ -222,6 +224,11 @@ function PlanCard({
             icon="conversations"
             label="Conversations/month"
             value={features.maxConversationsPerMonth ? String(features.maxConversationsPerMonth) : "Unlimited"}
+          />
+          <FeatureRow
+            icon="seats"
+            label="Email seats"
+            value={features.maxStaff ? String(features.maxStaff) : "Unlimited"}
           />
           <FeatureRow icon="analytics" label="Analytics" value={features.analytics ? "Reply mix, containment, wait times, CSAT" : "Not included"} />
           <FeatureRow icon="digest" label="Weekly email digest" value={features.weeklyDigest ? "Included" : "Not included"} />
