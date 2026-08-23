@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
+import { type PlanTier } from "@/lib/billing";
 
 export const Route = createFileRoute("/_platform-admin/admin-customers")({
   component: CustomersAdminPage,
@@ -48,23 +48,26 @@ function CustomersAdminPage() {
     },
   });
 
-  const { data: orgs, refetch: refetchOrgs } = useQuery({
-    queryKey: ["all-orgs-with-subs"],
-    queryFn: async (): Promise<Org[]> => {
+  // Only used to populate the "assign to organisation" dropdown below —
+  // the full org list with properties/subscriptions now lives on the
+  // Live customers page instead.
+  const { data: orgNames, refetch: refetchOrgNames } = useQuery({
+    queryKey: ["org-names-for-assign"],
+    queryFn: async (): Promise<{ id: string; name: string }[]> => {
       const res = await callAdmin({ action: "listOrgs" });
-      return res.orgs;
+      return (res.orgs as Org[]).map((o) => ({ id: o.id, name: o.name }));
     },
   });
 
   function refreshAll() {
     qc.invalidateQueries({ queryKey: ["unassigned-properties"] });
-    refetchOrgs();
+    refetchOrgNames();
   }
 
   return (
     <div className="p-6 max-w-4xl space-y-6">
       <div>
-        <h1 className="font-serif text-3xl">Customer onboarding</h1>
+        <h1 className="font-serif text-3xl">Onboard customer</h1>
         <p className="text-sm text-muted-foreground">Internal tool — not visible to hotel staff.</p>
       </div>
 
@@ -80,17 +83,11 @@ function CustomersAdminPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {unassigned!.map((p) => (
-              <AssignPropertyRow key={p.id} propertyId={p.id} propertyName={p.name} orgs={orgs ?? []} onDone={refreshAll} />
+              <AssignPropertyRow key={p.id} propertyId={p.id} propertyName={p.name} orgs={orgNames ?? []} onDone={refreshAll} />
             ))}
           </CardContent>
         </Card>
       )}
-
-      <div className="space-y-4">
-        {(orgs ?? []).map((org) => (
-          <OrgCard key={org.id} org={org} onDone={refreshAll} />
-        ))}
-      </div>
     </div>
   );
 }
@@ -174,7 +171,7 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
 
 function AssignPropertyRow({
   propertyId, propertyName, orgs, onDone,
-}: { propertyId: string; propertyName: string; orgs: Org[]; onDone: () => void }) {
+}: { propertyId: string; propertyName: string; orgs: { id: string; name: string }[]; onDone: () => void }) {
   const [orgId, setOrgId] = useState<string>("");
   const [assigning, setAssigning] = useState(false);
 
@@ -203,91 +200,5 @@ function AssignPropertyRow({
       </Select>
       <Button size="sm" onClick={assign} disabled={!orgId || assigning}>{assigning ? "Assigning…" : "Assign"}</Button>
     </div>
-  );
-}
-
-function OrgCard({ org, onDone }: { org: Org; onDone: () => void }) {
-  const [email, setEmail] = useState("");
-  const [addingAdmin, setAddingAdmin] = useState(false);
-  const [tier, setTier] = useState<PlanTier>("growth");
-  const [propertyCount, setPropertyCount] = useState(Math.max(1, org.properties.length));
-  const [activating, setActivating] = useState(false);
-
-  async function addAdmin() {
-    if (!email.trim()) return;
-    setAddingAdmin(true);
-    try {
-      await callAdmin({ action: "addOrgAdmin", orgId: org.id, email: email.trim() });
-      toast.success("Admin added");
-      setEmail("");
-      onDone();
-    } catch (e) {
-      toast.error(String((e as Error).message));
-    } finally {
-      setAddingAdmin(false);
-    }
-  }
-
-  async function activate() {
-    setActivating(true);
-    try {
-      const res = await callAdmin({ action: "activateSubscription", orgId: org.id, planTier: tier, propertyCount });
-      toast.success(`Activated — PKR ${res.amountPkr?.toLocaleString()}/mo`);
-      onDone();
-    } catch (e) {
-      toast.error(String((e as Error).message));
-    } finally {
-      setActivating(false);
-    }
-  }
-
-  const sub = org.subscription;
-  const amount = PLAN_PRICING_PKR[tier].monthlyPkr * propertyCount;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center justify-between">
-          <span>{org.name}</span>
-          <span className="text-sm font-normal text-muted-foreground">
-            {org.properties.length} propert{org.properties.length === 1 ? "y" : "ies"}
-            {sub ? ` · ${sub.plan_tier} (${sub.status})${sub.current_period_end ? ` until ${new Date(sub.current_period_end).toLocaleDateString()}` : ""}` : " · Starter (no subscription)"}
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {org.properties.length > 0 && (
-          <p className="text-xs text-muted-foreground">{org.properties.map((p) => p.name).join(", ")}</p>
-        )}
-
-        <div className="flex gap-2">
-          <Input placeholder="Add another admin by email" value={email} onChange={(e) => setEmail(e.target.value)} className="flex-1" />
-          <Button size="sm" variant="outline" onClick={addAdmin} disabled={addingAdmin || !email.trim()}>
-            {addingAdmin ? "Adding…" : "Add admin"}
-          </Button>
-        </div>
-
-        <div className="flex items-end gap-2">
-          <div>
-            <Label className="text-xs">Plan</Label>
-            <Select value={tier} onValueChange={(v) => setTier(v as PlanTier)}>
-              <SelectTrigger className="w-32 mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="growth">Growth</SelectItem>
-                <SelectItem value="pro">Pro</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs">Properties</Label>
-            <Input type="number" min={1} value={propertyCount} onChange={(e) => setPropertyCount(Math.max(1, Number(e.target.value)))} className="w-20 mt-1" />
-          </div>
-          <p className="text-sm text-muted-foreground flex-1">PKR {amount.toLocaleString()}/mo</p>
-          <Button size="sm" onClick={activate} disabled={activating}>
-            {activating ? "Activating…" : "Activate 30 days"}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
