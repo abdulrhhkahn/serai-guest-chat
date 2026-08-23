@@ -30,7 +30,7 @@ async function callAdmin(body: Record<string, unknown>) {
 }
 
 function LiveCustomersPage() {
-  const { data: orgs, isLoading } = useQuery({
+  const { data: orgs, isLoading, isError, error } = useQuery({
     queryKey: ["all-orgs-with-subs"],
     queryFn: async (): Promise<Org[]> => {
       const res = await callAdmin({ action: "listOrgs" });
@@ -47,6 +47,8 @@ function LiveCustomersPage() {
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : isError ? (
+        <p className="text-sm text-destructive">Couldn't load customers: {String((error as Error)?.message ?? error)}</p>
       ) : (orgs?.length ?? 0) === 0 ? (
         <p className="text-sm text-muted-foreground">No customers yet — onboard one first.</p>
       ) : (
