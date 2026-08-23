@@ -140,7 +140,7 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
-          <Label className="text-xs">Hotel name</Label>
+          <Label className="text-xs">Hotel name <span className="text-destructive">*</span></Label>
           <Input className="mt-1" placeholder="Cedar Inn" value={hotelName} onChange={(e) => setHotelName(e.target.value)} />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -149,12 +149,12 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
             <Input className="mt-1" placeholder="Optional" value={adminName} onChange={(e) => setAdminName(e.target.value)} />
           </div>
           <div>
-            <Label className="text-xs">Admin email</Label>
+            <Label className="text-xs">Admin email <span className="text-destructive">*</span></Label>
             <Input className="mt-1" type="email" placeholder="owner@cedarinn.com" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
           </div>
         </div>
         <div>
-          <Label className="text-xs">Plan</Label>
+          <Label className="text-xs">Plan <span className="text-destructive">*</span></Label>
           <Select value={planTier} onValueChange={(v) => setPlanTier(v as "basic" | PlanTier)}>
             <SelectTrigger className="mt-1 w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
