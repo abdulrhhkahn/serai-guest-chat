@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { GuestTurnstile } from "@/components/GuestTurnstile";
 import { toast } from "sonner";
 import {
@@ -20,6 +20,7 @@ import {
   Mail,
   Building2,
   QrCode,
+  X,
   Users,
 } from "lucide-react";
 import { PLAN_FEATURES, PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
@@ -217,9 +218,11 @@ function SubscribeLeadForm({
   // dialog. It deliberately does NOT continue on to Safepay checkout;
   // "or buy now" on the card is the only path that does that.
   //
-  // While submitting: every field, the Select triggers, the Cancel button,
-  // and backdrop-click/Escape (via onOpenChange below) are all disabled —
-  // no way to edit or close mid-flight and leave a half-finished insert.
+  // While submitting: every field, the Select triggers, the top-right
+  // close X, and backdrop-click/Escape (all via onOpenChange below,
+  // since Radix's built-in Close button routes through it too) are
+  // disabled — no way to edit or close mid-flight and leave a
+  // half-finished insert.
   async function submit() {
     if (!isValid || submitting) return;
     setSubmitting(true);
@@ -247,28 +250,35 @@ function SubscribeLeadForm({
 
   return (
     <Dialog open onOpenChange={(open) => !open && !submitting && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md relative" hideClose>
+        <DialogClose
+          disabled={submitting}
+          className="absolute right-6 top-6 opacity-70 hover:opacity-100 disabled:pointer-events-none disabled:opacity-30"
+        >
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
         <DialogHeader>
           <DialogTitle>Subscribe to {PLAN_PRICING_PKR[tier].label}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">First name</Label>
+              <Label className="text-xs">First name <span className="text-destructive">*</span></Label>
               <Input className="mt-1" value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={submitting} />
             </div>
             <div>
-              <Label className="text-xs">Last name</Label>
+              <Label className="text-xs">Last name <span className="text-destructive">*</span></Label>
               <Input className="mt-1" value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={submitting} />
             </div>
           </div>
           <div>
-            <Label className="text-xs">Work email</Label>
+            <Label className="text-xs">Work email <span className="text-destructive">*</span></Label>
             <Input className="mt-1" type="email" value={workEmail} onChange={(e) => setWorkEmail(e.target.value)} disabled={submitting} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Property type</Label>
+              <Label className="text-xs">Property type <span className="text-destructive">*</span></Label>
               <Select value={propertyType} onValueChange={setPropertyType} disabled={submitting}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Select" /></SelectTrigger>
                 <SelectContent>
@@ -277,12 +287,12 @@ function SubscribeLeadForm({
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Properties (number)</Label>
+              <Label className="text-xs">Properties (number) <span className="text-destructive">*</span></Label>
               <Input className="mt-1" type="number" min={1} value={propertyCount} onChange={(e) => setPropertyCount(e.target.value)} disabled={submitting} />
             </div>
           </div>
           <div>
-            <Label className="text-xs">Phone</Label>
+            <Label className="text-xs">Phone <span className="text-destructive">*</span></Label>
             <Input className="mt-1" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={submitting} />
           </div>
           <div>
@@ -296,8 +306,7 @@ function SubscribeLeadForm({
           </div>
           <GuestTurnstile onToken={setCaptchaToken} />
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>
+        <DialogFooter className="sm:justify-center">
           <Button onClick={submit} disabled={!isValid || submitting}>
             {submitting ? "Submitting…" : "Submit"}
           </Button>
