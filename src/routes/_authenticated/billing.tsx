@@ -22,6 +22,7 @@ import {
   QrCode,
   X,
   Users,
+  UserCheck,
 } from "lucide-react";
 import { PLAN_FEATURES, PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
 
@@ -166,16 +167,23 @@ const FEATURE_ICON = {
   multiProperty: Building2,
   checkin: QrCode,
   seats: Users,
+  verify: UserCheck,
 } as const;
 
-function FeatureRow({ icon, label, value }: { icon: keyof typeof FEATURE_ICON; label: string; value: string }) {
+function FeatureRow({ icon, label, value }: { icon: keyof typeof FEATURE_ICON; label: string; value?: string }) {
   const IconComp = FEATURE_ICON[icon];
   return (
     <li className="flex items-start gap-2.5">
       <IconComp className="h-4 w-4 text-brand shrink-0 mt-0.5" />
       <span className="text-sm text-muted-foreground">
-        <span className="font-medium text-foreground">{label} — </span>
-        {value}
+        {value ? (
+          <>
+            <span className="font-medium text-foreground">{label} — </span>
+            {value}
+          </>
+        ) : (
+          <span className="font-medium text-foreground">{label}</span>
+        )}
       </span>
     </li>
   );
@@ -362,6 +370,7 @@ function PlanCard({
       <CardContent className="flex flex-col flex-1 pt-5">
         <ul className="space-y-3 flex-1">
           <FeatureRow icon="checkin" label="Mobile check-in" value="QR code check-in for guests" />
+          <FeatureRow icon="verify" label="Review and verify guest arrivals" />
           <FeatureRow
             icon="channels"
             label="Channels"
