@@ -181,12 +181,18 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
 
   // Also the reactivation path for an offboarded hotel — inserting a
   // fresh 'active' row here is what moves it back to Live Customers.
+  // If Basic is selected, there's no paid tier to activate, so this
+  // does the same thing Deactivate/Save-to-Basic would: reverts to Basic.
   async function activate() {
-    if (tier === "basic") return;
     setActivating(true);
     try {
-      const res = await callAdmin({ action: "activateSubscription", orgId, planTier: tier, propertyCount });
-      toast.success(`Activated — PKR ${res.amountPkr?.toLocaleString()}/mo`);
+      if (tier === "basic") {
+        await callAdmin({ action: "deactivateSubscription", orgId });
+        toast.success("Reverted to Basic");
+      } else {
+        const res = await callAdmin({ action: "activateSubscription", orgId, planTier: tier, propertyCount });
+        toast.success(`Activated — PKR ${res.amountPkr?.toLocaleString()}/mo`);
+      }
       refetch();
       qc.invalidateQueries({ queryKey: ["all-orgs-with-subs"] });
     } catch (e) {
@@ -308,7 +314,7 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
                     </p>
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button size="sm" onClick={activate} disabled={activating || tier === "basic"}>
+                    <Button size="sm" onClick={activate} disabled={activating}>
                       {activating ? "Activating…" : "Activate 30 days"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={deactivate} disabled={deactivating}>
