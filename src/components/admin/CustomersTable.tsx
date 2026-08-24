@@ -181,14 +181,17 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
 
   // Also the reactivation path for an offboarded hotel — inserting a
   // fresh 'active' row here is what moves it back to Live Customers.
-  // If Basic is selected, there's no paid tier to activate, so this
-  // does the same thing Deactivate/Save-to-Basic would: reverts to Basic.
+  // If Basic is selected, this restores the true "no subscription"
+  // state instead — bringing a Live-but-free hotel back, or un-offboarding
+  // one that was deactivated. This is deliberately NOT the same action as
+  // Deactivate: choosing Basic here means "stay/become a live customer on
+  // the free tier," not "offboard them."
   async function activate() {
     setActivating(true);
     try {
       if (tier === "basic") {
-        await callAdmin({ action: "deactivateSubscription", orgId });
-        toast.success("Reverted to Basic");
+        await callAdmin({ action: "clearSubscription", orgId });
+        toast.success("Live on Basic");
       } else {
         const res = await callAdmin({ action: "activateSubscription", orgId, planTier: tier, propertyCount });
         toast.success(`Activated — PKR ${res.amountPkr?.toLocaleString()}/mo`);
@@ -202,6 +205,8 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
     }
   }
 
+  // Always means "explicitly offboard this hotel" — unrelated to
+  // whatever tier happens to be selected in the dropdown.
   async function deactivate() {
     setDeactivating(true);
     try {
@@ -216,12 +221,17 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
     }
   }
 
+  // Same Basic-vs-paid distinction as activate() above.
   async function save() {
-    if (tier === "basic") return;
     setSaving(true);
     try {
-      const res = await callAdmin({ action: "updateSubscription", orgId, planTier: tier, propertyCount });
-      toast.success(`Saved — PKR ${res.amountPkr?.toLocaleString()}/mo`);
+      if (tier === "basic") {
+        await callAdmin({ action: "clearSubscription", orgId });
+        toast.success("Live on Basic");
+      } else {
+        const res = await callAdmin({ action: "updateSubscription", orgId, planTier: tier, propertyCount });
+        toast.success(`Saved — PKR ${res.amountPkr?.toLocaleString()}/mo`);
+      }
       refetch();
       qc.invalidateQueries({ queryKey: ["all-orgs-with-subs"] });
     } catch (e) {
@@ -233,7 +243,6 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
 
   const sub = data?.subscription;
   const amount = tier === "basic" ? 0 : PLAN_PRICING_PKR[tier].monthlyPkr * propertyCount;
-  const hasActiveSub = sub?.status === "active";
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -320,7 +329,7 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
                     <Button size="sm" variant="outline" onClick={deactivate} disabled={deactivating}>
                       {deactivating ? "Deactivating…" : "Deactivate"}
                     </Button>
-                    <Button size="sm" variant="outline" onClick={save} disabled={saving || tier === "basic" || !hasActiveSub}>
+                    <Button size="sm" variant="outline" onClick={save} disabled={saving}>
                       {saving ? "Saving…" : "Save"}
                     </Button>
                   </div>
