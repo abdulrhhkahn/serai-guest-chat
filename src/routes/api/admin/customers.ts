@@ -192,6 +192,32 @@ export const Route = createFileRoute("/api/admin/customers")({
             return error ? bad(error.message, 500) : ok();
           }
 
+          // Edits an EXISTING subscription's tier/property count in place
+          // — unlike activateSubscription, this doesn't touch status or
+          // current_period_end (no renewal reset), it's just correcting
+          // details on what's already active. Nothing to update if the
+          // org has never had a subscription at all.
+          case "updateSubscription": {
+            const orgId = String(body.orgId ?? "");
+            const planTier = body.planTier as PlanTier;
+            const propertyCount = Math.max(1, Number(body.propertyCount ?? 1));
+            if (!orgId) return bad("Missing orgId");
+            if (planTier !== "growth" && planTier !== "pro") return bad("planTier must be growth or pro");
+
+            const { data: latest } = await supabaseAdmin
+              .from("subscriptions").select("id").eq("organization_id", orgId)
+              .order("created_at", { ascending: false }).limit(1).maybeSingle();
+            if (!latest) return bad("No subscription to update — activate one first", 404);
+
+            const plan = PLAN_PRICING_PKR[planTier];
+            const amountPkr = plan.monthlyPkr * propertyCount;
+            const { error } = await supabaseAdmin
+              .from("subscriptions")
+              .update({ plan_tier: planTier, safepay_plan_id: plan.planId, property_count: propertyCount, amount_pkr: amountPkr })
+              .eq("id", latest.id);
+            return error ? bad(error.message, 500) : ok({ amountPkr });
+          }
+
           // Reads every org with its properties and latest subscription,
           // via the service-role client — the browser's own Supabase
           // client can't do this itself, since organizations/subscriptions
