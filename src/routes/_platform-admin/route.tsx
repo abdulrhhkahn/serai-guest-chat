@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, Building2, Users, LogOut } from "lucide-react";
+import { Shield, Building2, Users, UserX, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -39,6 +39,7 @@ export const Route = createFileRoute("/_platform-admin")({
 const nav = [
   { to: "/admin-customers", label: "Onboard customer", icon: Building2 },
   { to: "/admin-live-customers", label: "Live customers", icon: Users },
+  { to: "/admin-offboarded-customers", label: "Offboarded customers", icon: UserX },
 ] as const;
 
 function PlatformAdminLayout() {
