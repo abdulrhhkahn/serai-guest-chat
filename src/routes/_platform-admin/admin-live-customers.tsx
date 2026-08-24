@@ -293,14 +293,14 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
                     </p>
                   </div>
                   <div className="flex justify-end gap-2">
+                    <Button size="sm" onClick={activate} disabled={activating || tier === "basic"}>
+                      {activating ? "Activating…" : "Activate 30 days"}
+                    </Button>
                     <Button size="sm" variant="outline" onClick={deactivate} disabled={deactivating}>
                       {deactivating ? "Deactivating…" : "Deactivate"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={save} disabled={saving || tier === "basic" || !hasActiveSub}>
                       {saving ? "Saving…" : "Save"}
-                    </Button>
-                    <Button size="sm" onClick={activate} disabled={activating || tier === "basic"}>
-                      {activating ? "Activating…" : "Activate 30 days"}
                     </Button>
                   </div>
                 </CardContent>
