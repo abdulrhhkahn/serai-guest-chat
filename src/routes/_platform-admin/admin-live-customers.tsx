@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,10 +128,26 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
 
   const [email, setEmail] = useState("");
   const [addingAdmin, setAddingAdmin] = useState(false);
-  const [tier, setTier] = useState<"basic" | PlanTier>("growth");
+  const [tier, setTier] = useState<"basic" | PlanTier>("basic");
   const [propertyCount, setPropertyCount] = useState(1);
   const [activating, setActivating] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // The dropdown was hardcoded to always start on "growth" regardless of
+  // the org's actual plan — sync it to what's really active once the
+  // detail data loads (and again if the org is reopened after a change).
+  useEffect(() => {
+    if (!data) return;
+    const sub = data.subscription;
+    if (sub && sub.status === "active" && (sub.plan_tier === "growth" || sub.plan_tier === "pro")) {
+      setTier(sub.plan_tier);
+      setPropertyCount(sub.property_count || 1);
+    } else {
+      setTier("basic");
+      setPropertyCount(1);
+    }
+  }, [data]);
 
   async function addAdmin() {
     if (!email.trim()) return;
@@ -177,8 +193,26 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
     }
   }
 
+  // Edits plan/property count on the existing subscription without
+  // resetting its renewal date — for fixing details, not renewing.
+  async function save() {
+    if (tier === "basic") return;
+    setSaving(true);
+    try {
+      const res = await callAdmin({ action: "updateSubscription", orgId, planTier: tier, propertyCount });
+      toast.success(`Saved — PKR ${res.amountPkr?.toLocaleString()}/mo`);
+      refetch();
+      qc.invalidateQueries({ queryKey: ["all-orgs-with-subs"] });
+    } catch (e) {
+      toast.error(String((e as Error).message));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const sub = data?.subscription;
   const amount = tier === "basic" ? 0 : PLAN_PRICING_PKR[tier].monthlyPkr * propertyCount;
+  const hasActiveSub = sub?.status === "active";
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -237,7 +271,7 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
 
               <Card>
                 <CardHeader><CardTitle className="text-base">Subscription</CardTitle></CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <div className="flex items-end gap-2">
                     <div>
                       <Label className="text-xs">Plan</Label>
@@ -257,11 +291,16 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
                     <p className="text-sm text-muted-foreground flex-1">
                       {tier === "basic" ? "Free" : `PKR ${amount.toLocaleString()}/mo`}
                     </p>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={deactivate} disabled={deactivating}>
+                      {deactivating ? "Deactivating…" : "Deactivate"}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={save} disabled={saving || tier === "basic" || !hasActiveSub}>
+                      {saving ? "Saving…" : "Save"}
+                    </Button>
                     <Button size="sm" onClick={activate} disabled={activating || tier === "basic"}>
                       {activating ? "Activating…" : "Activate 30 days"}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={deactivate} disabled={deactivating || sub?.status !== "active"}>
-                      {deactivating ? "Deactivating…" : "Deactivate"}
                     </Button>
                   </div>
                 </CardContent>
