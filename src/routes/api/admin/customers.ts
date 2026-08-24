@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { isValidEmail } from "@/lib/org-manage";
+import { isValidEmail, canRemoveAdmin } from "@/lib/org-manage";
 import { PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
 
 /**
@@ -147,6 +147,18 @@ export const Route = createFileRoute("/api/admin/customers")({
             const target = list?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
             if (!target) return bad("No user with that email — they must sign in once first", 404);
             const { error } = await supabaseAdmin.from("org_admins").upsert({ org_id: orgId, user_id: target.id });
+            return error ? bad(error.message, 500) : ok();
+          }
+
+          case "removeOrgAdmin": {
+            const orgId = String(body.orgId ?? "");
+            const userId = String(body.userId ?? "");
+            if (!orgId) return bad("Missing orgId");
+            if (!userId) return bad("Missing userId");
+            const { count } = await supabaseAdmin
+              .from("org_admins").select("user_id", { count: "exact", head: true }).eq("org_id", orgId);
+            if (!canRemoveAdmin({ adminCount: count ?? 0 })) return bad("Can't remove the last admin", 409);
+            const { error } = await supabaseAdmin.from("org_admins").delete().eq("org_id", orgId).eq("user_id", userId);
             return error ? bad(error.message, 500) : ok();
           }
 
