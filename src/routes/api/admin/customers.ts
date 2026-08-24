@@ -213,6 +213,20 @@ export const Route = createFileRoute("/api/admin/customers")({
             return error ? bad(error.message, 500) : ok();
           }
 
+          // Reactivating a hotel onto Basic specifically (as opposed to
+          // Deactivate, which explicitly offboards them) means restoring
+          // the true "no subscription row" state — same as a hotel that's
+          // always been free. Deleting the row(s) rather than updating
+          // status is deliberate: nothing in the subscription_status enum
+          // means "not offboarded, but also not paying," so a canceled
+          // marker left behind would trap the org in Offboarded forever.
+          case "clearSubscription": {
+            const orgId = String(body.orgId ?? "");
+            if (!orgId) return bad("Missing orgId");
+            const { error } = await supabaseAdmin.from("subscriptions").delete().eq("organization_id", orgId);
+            return error ? bad(error.message, 500) : ok();
+          }
+
           // Edits an EXISTING subscription's tier/property count in place
           // — unlike activateSubscription, this doesn't touch status or
           // current_period_end (no renewal reset), it's just correcting
