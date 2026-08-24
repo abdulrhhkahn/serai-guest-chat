@@ -128,9 +128,10 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
 
   const [email, setEmail] = useState("");
   const [addingAdmin, setAddingAdmin] = useState(false);
-  const [tier, setTier] = useState<PlanTier>("growth");
+  const [tier, setTier] = useState<"basic" | PlanTier>("growth");
   const [propertyCount, setPropertyCount] = useState(1);
   const [activating, setActivating] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
 
   async function addAdmin() {
     if (!email.trim()) return;
@@ -148,6 +149,7 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
   }
 
   async function activate() {
+    if (tier === "basic") return;
     setActivating(true);
     try {
       const res = await callAdmin({ action: "activateSubscription", orgId, planTier: tier, propertyCount });
@@ -161,8 +163,22 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
     }
   }
 
+  async function deactivate() {
+    setDeactivating(true);
+    try {
+      await callAdmin({ action: "deactivateSubscription", orgId });
+      toast.success("Subscription deactivated — reverted to Basic");
+      refetch();
+      qc.invalidateQueries({ queryKey: ["all-orgs-with-subs"] });
+    } catch (e) {
+      toast.error(String((e as Error).message));
+    } finally {
+      setDeactivating(false);
+    }
+  }
+
   const sub = data?.subscription;
-  const amount = PLAN_PRICING_PKR[tier].monthlyPkr * propertyCount;
+  const amount = tier === "basic" ? 0 : PLAN_PRICING_PKR[tier].monthlyPkr * propertyCount;
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -225,9 +241,10 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
                   <div className="flex items-end gap-2">
                     <div>
                       <Label className="text-xs">Plan</Label>
-                      <Select value={tier} onValueChange={(v) => setTier(v as PlanTier)}>
+                      <Select value={tier} onValueChange={(v) => setTier(v as "basic" | PlanTier)}>
                         <SelectTrigger className="w-32 mt-1"><SelectValue /></SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="basic">Basic</SelectItem>
                           <SelectItem value="growth">Growth</SelectItem>
                           <SelectItem value="pro">Pro</SelectItem>
                         </SelectContent>
@@ -235,11 +252,16 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
                     </div>
                     <div>
                       <Label className="text-xs">Properties</Label>
-                      <Input type="number" min={1} value={propertyCount} onChange={(e) => setPropertyCount(Math.max(1, Number(e.target.value)))} className="w-20 mt-1" />
+                      <Input type="number" min={1} value={propertyCount} onChange={(e) => setPropertyCount(Math.max(1, Number(e.target.value)))} className="w-20 mt-1" disabled={tier === "basic"} />
                     </div>
-                    <p className="text-sm text-muted-foreground flex-1">PKR {amount.toLocaleString()}/mo</p>
-                    <Button size="sm" onClick={activate} disabled={activating}>
+                    <p className="text-sm text-muted-foreground flex-1">
+                      {tier === "basic" ? "Free" : `PKR ${amount.toLocaleString()}/mo`}
+                    </p>
+                    <Button size="sm" onClick={activate} disabled={activating || tier === "basic"}>
                       {activating ? "Activating…" : "Activate 30 days"}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={deactivate} disabled={deactivating || sub?.status !== "active"}>
+                      {deactivating ? "Deactivating…" : "Deactivate"}
                     </Button>
                   </div>
                 </CardContent>
