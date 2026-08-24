@@ -146,6 +146,7 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
 
   const [email, setEmail] = useState("");
   const [addingAdmin, setAddingAdmin] = useState(false);
+  const [removingAdminId, setRemovingAdminId] = useState<string | null>(null);
   const [tier, setTier] = useState<"basic" | PlanTier>("basic");
   const [propertyCount, setPropertyCount] = useState(1);
   const [activating, setActivating] = useState(false);
@@ -176,6 +177,19 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
       toast.error(String((e as Error).message));
     } finally {
       setAddingAdmin(false);
+    }
+  }
+
+  async function removeAdmin(userId: string) {
+    setRemovingAdminId(userId);
+    try {
+      await callAdmin({ action: "removeOrgAdmin", orgId, userId });
+      toast.success("Admin removed");
+      refetch();
+    } catch (e) {
+      toast.error(String((e as Error).message));
+    } finally {
+      setRemovingAdminId(null);
     }
   }
 
@@ -286,7 +300,18 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
                   ) : (
                     <ul className="space-y-1 text-sm">
                       {data.admins.map((a) => (
-                        <li key={a.id}>{a.email ?? "Unknown"}</li>
+                        <li key={a.id} className="flex items-center justify-between">
+                          <span>{a.email ?? "Unknown"}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                            disabled={removingAdminId === a.id || data.admins.length <= 1}
+                            onClick={() => removeAdmin(a.id)}
+                          >
+                            {removingAdminId === a.id ? "Removing…" : "Remove"}
+                          </Button>
+                        </li>
                       ))}
                     </ul>
                   )}
