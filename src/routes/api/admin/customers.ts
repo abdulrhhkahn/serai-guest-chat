@@ -176,6 +176,22 @@ export const Route = createFileRoute("/api/admin/customers")({
             return error ? bad(error.message, 500) : ok({ amountPkr, periodEnd: periodEnd.toISOString() });
           }
 
+          // Cancels the org's current subscription — reverts them to
+          // Basic everywhere else in the app (plan-gating checks status
+          // in ('active','past_due'), so 'canceled' falls through to the
+          // Basic default automatically). Keeps the row for history
+          // rather than deleting it.
+          case "deactivateSubscription": {
+            const orgId = String(body.orgId ?? "");
+            if (!orgId) return bad("Missing orgId");
+            const { data: latest } = await supabaseAdmin
+              .from("subscriptions").select("id").eq("organization_id", orgId)
+              .order("created_at", { ascending: false }).limit(1).maybeSingle();
+            if (!latest) return bad("No subscription to deactivate", 404);
+            const { error } = await supabaseAdmin.from("subscriptions").update({ status: "canceled" }).eq("id", latest.id);
+            return error ? bad(error.message, 500) : ok();
+          }
+
           // Reads every org with its properties and latest subscription,
           // via the service-role client — the browser's own Supabase
           // client can't do this itself, since organizations/subscriptions
