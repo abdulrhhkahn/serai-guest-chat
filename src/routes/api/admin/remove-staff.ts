@@ -2,14 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * Staff emails live in auth.users, which clients can never query directly
- * (no RLS policy exposes it, by design) — so listing "name + email" for a
- * property's staff has to go through a server route with the service-role
- * client. Read-only; same authorization shape as invite-staff.ts.
+ * Removes someone from a property's staff list — deletes their
+ * staff_profiles row, which is what actually gates their access (RLS
+ * checks current_staff_property_id()). Doesn't touch their user_roles or
+ * any org_admins entry; those are managed separately, not tied to a
+ * single property's staff list.
  *
- * POST body: { propertyId }
+ * POST body: { propertyId, userId }
  */
-export const Route = createFileRoute("/api/admin/property-staff")({
+export const Route = createFileRoute("/api/admin/remove-staff")({
   server: {
     handlers: {
       POST: async ({ request }) => {
@@ -24,18 +25,21 @@ export const Route = createFileRoute("/api/admin/property-staff")({
         if (userErr || !userData.user) return new Response("Unauthorized", { status: 401 });
         const uid = userData.user.id;
 
-        let body: { propertyId?: string };
+        let body: { propertyId?: string; userId?: string };
         try {
           body = await request.json();
         } catch {
           return new Response("Bad request", { status: 400 });
         }
         const propertyId = String(body.propertyId ?? "");
+        const userId = String(body.userId ?? "");
         if (!propertyId) return new Response("Missing propertyId", { status: 400 });
+        if (!userId) return new Response("Missing userId", { status: 400 });
+        if (userId === uid) return new Response("Can't remove yourself", { status: 400 });
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // Authorized: staff on this property, org admin for it, or site admin.
+        // Same authorization shape as invite-staff.ts.
         const [{ data: roles }, { data: property }, { data: selfProfile }] = await Promise.all([
           supabaseAdmin.from("user_roles").select("role").eq("user_id", uid),
           supabaseAdmin.from("properties").select("organization_id").eq("id", propertyId).maybeSingle(),
@@ -53,31 +57,9 @@ export const Route = createFileRoute("/api/admin/property-staff")({
         }
         if (!authorized) return new Response("Forbidden", { status: 403 });
 
-        const { data: profiles } = await supabaseAdmin
-          .from("staff_profiles")
-          .select("id, full_name")
-          .eq("property_id", propertyId);
-
-        const { data: orgAdminRows } = property?.organization_id
-          ? await supabaseAdmin.from("org_admins").select("user_id").eq("org_id", property.organization_id)
-          : { data: [] as { user_id: string }[] };
-        const orgAdminIds = new Set((orgAdminRows ?? []).map((a) => a.user_id));
-
-        const staff = await Promise.all(
-          (profiles ?? []).map(async (p) => {
-            const { data } = await supabaseAdmin.auth.admin.getUserById(p.id);
-            return { id: p.id, full_name: p.full_name, email: data?.user?.email ?? null, isAdmin: orgAdminIds.has(p.id) };
-          }),
-        );
-
-        const { data: invites } = await supabaseAdmin
-          .from("staff_invites")
-          .select("id, email, status, created_at")
-          .eq("property_id", propertyId)
-          .eq("status", "pending")
-          .order("created_at", { ascending: false });
-
-        return Response.json({ staff, invites: invites ?? [] });
+        const { error } = await supabaseAdmin.from("staff_profiles").delete().eq("id", userId).eq("property_id", propertyId);
+        if (error) return new Response(error.message, { status: 500 });
+        return Response.json({ ok: true });
       },
     },
   },
