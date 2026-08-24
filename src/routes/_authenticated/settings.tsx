@@ -397,6 +397,7 @@ function StaffCard({ propertyId }: { propertyId: string }) {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [inviting, setInviting] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const { data: plan } = usePlanTier(propertyId);
   const maxStaff = plan?.proOk ? null : plan?.growthOk ? 5 : 2;
@@ -412,7 +413,7 @@ function StaffCard({ propertyId }: { propertyId: string }) {
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json() as Promise<{
-        staff: { id: string; full_name: string | null; email: string | null }[];
+        staff: { id: string; full_name: string | null; email: string | null; isAdmin: boolean }[];
         invites: { id: string; email: string; status: string; created_at: string }[];
       }>;
     },
@@ -439,6 +440,25 @@ function StaffCard({ propertyId }: { propertyId: string }) {
     }
   }
 
+  async function removeStaff(userId: string) {
+    setRemovingId(userId);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const res = await fetch("/api/admin/remove-staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
+        body: JSON.stringify({ propertyId, userId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success("Removed");
+      qc.invalidateQueries({ queryKey: ["property-staff", propertyId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to remove");
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
   return (
     <Card className="p-5 space-y-4">
       <div className="flex items-center justify-between">
@@ -454,6 +474,19 @@ function StaffCard({ propertyId }: { propertyId: string }) {
             <li key={s.id} className="flex items-center gap-2">
               <span className="font-medium">{s.full_name || "Unnamed"}</span>
               {s.email && <span className="text-muted-foreground">— {s.email}</span>}
+              {s.isAdmin && (
+                <span className="rounded-md bg-brand/15 text-brand px-2 py-0.5 text-xs">Admin</span>
+              )}
+              <span className="flex-1" />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                disabled={removingId === s.id}
+                onClick={() => removeStaff(s.id)}
+              >
+                {removingId === s.id ? "Removing…" : "Remove"}
+              </Button>
             </li>
           ))}
         </ul>
