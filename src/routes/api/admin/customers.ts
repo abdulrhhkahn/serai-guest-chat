@@ -187,8 +187,29 @@ export const Route = createFileRoute("/api/admin/customers")({
             const { data: latest } = await supabaseAdmin
               .from("subscriptions").select("id").eq("organization_id", orgId)
               .order("created_at", { ascending: false }).limit(1).maybeSingle();
-            if (!latest) return bad("No subscription to deactivate", 404);
-            const { error } = await supabaseAdmin.from("subscriptions").update({ status: "canceled" }).eq("id", latest.id);
+
+            if (latest) {
+              const { error } = await supabaseAdmin.from("subscriptions").update({ status: "canceled" }).eq("id", latest.id);
+              return error ? bad(error.message, 500) : ok();
+            }
+
+            // A hotel that's always been on Basic has no subscription row
+            // at all to cancel — insert a placeholder canceled one purely
+            // as an "offboarded" marker. amount_pkr: 0 and plan_tier
+            // 'basic' here don't affect plan-gating anywhere else in the
+            // app, since those checks only ever look at status
+            // in ('active','past_due') — a canceled row is invisible to
+            // them exactly like having no row at all, except it now
+            // correctly places the hotel in Offboarded customers.
+            const { error } = await supabaseAdmin.from("subscriptions").insert({
+              organization_id: orgId,
+              safepay_subscription_reference: `manual-offboard-${orgId}-${Date.now()}`,
+              safepay_plan_id: "plan_basic_offboarded",
+              plan_tier: "basic",
+              status: "canceled",
+              property_count: 1,
+              amount_pkr: 0,
+            });
             return error ? bad(error.message, 500) : ok();
           }
 
