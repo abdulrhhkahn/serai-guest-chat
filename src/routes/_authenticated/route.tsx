@@ -1,8 +1,8 @@
 import { createFileRoute, Outlet, redirect, useNavigate, Link, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarHeader, useSidebar } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarHeader, SidebarSeparator, useSidebar } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2 } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2, Table } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
@@ -248,6 +248,19 @@ function AuthedLayout() {
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
+                  )}
+                  {isAdmin && (
+                    <>
+                      <SidebarSeparator className="my-1" />
+                      <SidebarMenuItem key="/properties">
+                        <SidebarMenuButton asChild isActive={pathname === "/properties"} tooltip="Properties">
+                          <Link to={"/properties" as "/settings"} className="flex items-center gap-2">
+                            <Table className={`h-4 w-4 ${pathname === "/properties" ? "text-brand" : ""}`} />
+                            <span>Properties</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </>
                   )}
                 </SidebarMenu>
               </SidebarGroupContent>
