@@ -119,7 +119,7 @@ export function CustomersTable({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {sub?.current_period_end ? new Date(sub.current_period_end).toLocaleDateString() : "—"}
+                      {sub?.status === "active" && sub.current_period_end ? new Date(sub.current_period_end).toLocaleDateString() : "—"}
                     </td>
                   </tr>
                 );
@@ -255,7 +255,7 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
               <DialogTitle className="font-serif text-2xl">{data.org.name}</DialogTitle>
               <p className="text-sm text-muted-foreground">
                 {sub ? `${sub.plan_tier} plan (${sub.status})` : "No subscription — Basic"}
-                {sub?.current_period_end && ` · renews ${new Date(sub.current_period_end).toLocaleDateString()}`}
+                {sub?.status === "active" && sub.current_period_end && ` · renews ${new Date(sub.current_period_end).toLocaleDateString()}`}
               </p>
             </DialogHeader>
 
