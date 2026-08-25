@@ -190,9 +190,9 @@ const FEATURE_ICON = {
 function FeatureRow({ icon, label, value }: { icon: keyof typeof FEATURE_ICON; label: string; value?: string }) {
   const IconComp = FEATURE_ICON[icon];
   return (
-    <li className="flex items-start gap-2 min-h-[2.6rem]">
-      <IconComp className="h-3.5 w-3.5 text-brand shrink-0 mt-0.5" />
-      <span className="text-xs text-muted-foreground leading-snug">
+    <li className="flex items-start gap-2.5 min-h-[2.75rem]">
+      <IconComp className="h-4 w-4 text-brand shrink-0 mt-0.5" />
+      <span className="text-sm text-muted-foreground">
         {value ? (
           <>
             <span className="font-medium text-foreground">{label} — </span>
@@ -509,7 +509,7 @@ function PlanCard({
       <div className="border-t border-border" />
 
       <CardContent className="flex flex-col flex-1 pt-4">
-        <ul className="space-y-1.5 flex-1 text-xs">
+        <ul className="space-y-3 flex-1">
           <FeatureRow icon="checkin" label="Mobile check-in" value="QR code check-in for guests" />
           <FeatureRow icon="verify" label="Review and verify guests" />
           <FeatureRow icon="ai" label="AI chat behaviour" value={AUTONOMY_COPY[features.aiAutonomy]} />
