@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,6 +21,7 @@ import {
   X,
   Users,
   UserCheck,
+  History,
   Calendar as CalendarIcon,
 } from "lucide-react";
 import { PLAN_FEATURES, PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
@@ -184,14 +184,15 @@ const FEATURE_ICON = {
   checkin: QrCode,
   seats: Users,
   verify: UserCheck,
+  activity: History,
 } as const;
 
 function FeatureRow({ icon, label, value }: { icon: keyof typeof FEATURE_ICON; label: string; value?: string }) {
   const IconComp = FEATURE_ICON[icon];
   return (
-    <li className="flex items-start gap-2.5">
-      <IconComp className="h-4 w-4 text-brand shrink-0 mt-0.5" />
-      <span className="text-sm text-muted-foreground">
+    <li className="flex items-start gap-2 min-h-[2.6rem]">
+      <IconComp className="h-3.5 w-3.5 text-brand shrink-0 mt-0.5" />
+      <span className="text-xs text-muted-foreground leading-snug">
         {value ? (
           <>
             <span className="font-medium text-foreground">{label} — </span>
@@ -488,52 +489,51 @@ function PlanCard({
         </div>
       )}
       <CardHeader className="space-y-1">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="text-3xl font-bold">
-              {displayedMonthly !== null ? `PKR ${displayedMonthly.toLocaleString()}` : "Free"}
-              {pricing && <span className="text-sm font-normal text-muted-foreground">/mo</span>}
-            </p>
-            {pricing && billingCycle === "yearly" && (
-              <p className="text-xs text-muted-foreground mt-0.5">Billed annually — save {YEARLY_DISCOUNT_PERCENT}%</p>
+        <div>
+          <p className="text-3xl font-bold">
+            {displayedMonthly !== null ? `PKR ${displayedMonthly.toLocaleString()}` : "Free"}
+            {pricing ? (
+              <span className="text-sm font-normal text-muted-foreground">/mo</span>
+            ) : (
+              <span className="text-sm font-normal text-muted-foreground"> / Onboarding fees PKR {ONBOARDING_COST_PKR.toLocaleString()}</span>
             )}
-          </div>
-          {isCurrent && <Badge>Current</Badge>}
+          </p>
+          {pricing && billingCycle === "yearly" && (
+            <p className="text-xs text-muted-foreground mt-0.5">Billed annually — save {YEARLY_DISCOUNT_PERCENT}%</p>
+          )}
         </div>
         <p className="text-brand font-medium">{label}</p>
         <p className="text-sm text-muted-foreground">{TIER_DESCRIPTION[tier]}</p>
-        {tier === "basic" && (
-          <p className="text-xs text-muted-foreground">Onboarding cost PKR {ONBOARDING_COST_PKR.toLocaleString()}</p>
-        )}
       </CardHeader>
 
       <div className="border-t border-border" />
 
-      <CardContent className="flex flex-col flex-1 pt-5">
-        <ul className="space-y-3 flex-1">
+      <CardContent className="flex flex-col flex-1 pt-4">
+        <ul className="space-y-1.5 flex-1 text-xs">
           <FeatureRow icon="checkin" label="Mobile check-in" value="QR code check-in for guests" />
-          <FeatureRow icon="verify" label="Review and verify guest arrivals" />
+          <FeatureRow icon="verify" label="Review and verify guests" />
+          <FeatureRow icon="ai" label="AI chat behaviour" value={AUTONOMY_COPY[features.aiAutonomy]} />
           <FeatureRow
             icon="channels"
             label="Channels"
             value={features.channels.map((c) => (c === "web" ? "In app web chat" : c === "sms" ? "SMS" : "WhatsApp")).join(", ")}
           />
-          <FeatureRow icon="ai" label="AI behaviour" value={AUTONOMY_COPY[features.aiAutonomy]} />
           <FeatureRow
             icon="conversations"
-            label="Conversations/month"
-            value={features.maxConversationsPerMonth ? String(features.maxConversationsPerMonth) : "Unlimited"}
+            label="Conversations"
+            value={features.maxConversationsPerMonth ? `${features.maxConversationsPerMonth}/month` : "Unlimited"}
           />
+          <FeatureRow icon="activity" label="Staff activity" value={features.staffActivityLog ? "Included" : "Not included"} />
           <FeatureRow
             icon="seats"
             label="Email seats"
             value={features.maxStaff ? String(features.maxStaff) : "Unlimited"}
           />
           <FeatureRow icon="analytics" label="Analytics" value={features.analytics ? "Reply mix, containment, wait times, CSAT" : "Not included"} />
-          <FeatureRow icon="digest" label="Weekly analytics report email" value={features.weeklyDigest ? "Included" : "Not included"} />
+          <FeatureRow icon="digest" label="Weekly analytics report" value={features.weeklyDigest ? "Included" : "Not included"} />
           <FeatureRow
             icon="multiProperty"
-            label={features.orgRollup ? "Multi-property" : "Property type"}
+            label="Property"
             value={features.orgRollup ? "Add properties, cross-property comparison" : "Single property"}
           />
         </ul>
