@@ -578,6 +578,7 @@ export type Database = {
           plan_tier: string
           property_count: number
           property_type: string
+          scheduled_at: string | null
           submitted_by: string | null
           work_email: string
         }
@@ -591,6 +592,7 @@ export type Database = {
           plan_tier: string
           property_count: number
           property_type: string
+          scheduled_at?: string | null
           submitted_by?: string | null
           work_email: string
         }
@@ -604,6 +606,7 @@ export type Database = {
           plan_tier?: string
           property_count?: number
           property_type?: string
+          scheduled_at?: string | null
           submitted_by?: string | null
           work_email?: string
         }
