@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Sparkles, Send, FileText, Users, History, AlertTriangle, Clock, CheckCircle2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
+import { logActivity } from "@/lib/activity-log";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
@@ -295,6 +296,7 @@ function InboxPage() {
     ).eq("id", conversationId);
     if (error) return toast.error(error.message);
     await logEvent(conversationId, done ? "resolved" : "reopened");
+    if (done) await logActivity("conversation_resolved");
     // For SMS/WhatsApp conversations, invite a rating by text (web guests get the
     // in-app star prompt instead). dispatch no-ops for web conversations.
     if (done) {
@@ -354,6 +356,7 @@ function InboxPage() {
       });
     } catch { /* non-web dispatch is best-effort */ }
     await logEvent(conversationId, `reply_${source}`, body.trim().slice(0, 200));
+    await logActivity("message_sent", body.trim().slice(0, 100));
   }
 
   async function send(body: string, source: "manual" | "ai_draft_approved" | "ai_draft_edited" | "template" = "manual", originalDraft?: string | null) {

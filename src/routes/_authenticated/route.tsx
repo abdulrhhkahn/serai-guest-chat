@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect, useNavigate, Link, useRouterState } 
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarHeader, SidebarSeparator, useSidebar } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2, Table } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2, Table, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
@@ -302,6 +302,11 @@ function AuthedLayout() {
             <div className="text-sm text-muted-foreground capitalize flex-1">
               {pathname.replace("/", "") || "dashboard"}
             </div>
+            <Link to="/activity" title="Staff activity">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <History className="h-4 w-4" />
+              </Button>
+            </Link>
             <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto">

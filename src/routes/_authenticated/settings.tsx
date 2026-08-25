@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { Copy } from "lucide-react";
+import { logActivity } from "@/lib/activity-log";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -101,6 +102,7 @@ function SettingsForm({ form, setForm, saving, setSaving, uploading, setUploadin
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Saved");
+    await logActivity("settings_updated", `Updated ${form.name}`);
     qc.invalidateQueries({ queryKey: ["current-property"] });
   }
 
