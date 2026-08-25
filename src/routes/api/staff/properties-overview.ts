@@ -48,17 +48,22 @@ export const Route = createFileRoute("/api/staff/properties-overview")({
           if (!latestSubByOrg.has(s.organization_id)) latestSubByOrg.set(s.organization_id, s);
         }
 
-        const result = (properties ?? []).map((p) => {
-          const sub = p.organization_id ? latestSubByOrg.get(p.organization_id) : undefined;
-          return {
-            id: p.id,
-            name: p.name,
-            slug: p.slug,
-            organizationName: p.organization_id ? (orgNameById.get(p.organization_id) ?? "Unknown") : null,
-            planTier: sub?.status === "active" ? sub.plan_tier : "basic",
-            status: sub?.status ?? null,
-          };
-        });
+        const result = (properties ?? [])
+          .map((p) => {
+            const sub = p.organization_id ? latestSubByOrg.get(p.organization_id) : undefined;
+            return {
+              id: p.id,
+              name: p.name,
+              slug: p.slug,
+              organizationName: p.organization_id ? (orgNameById.get(p.organization_id) ?? "Unknown") : null,
+              planTier: sub?.status === "active" ? sub.plan_tier : "basic",
+              status: sub?.status ?? null,
+            };
+          })
+          // Offboarded (canceled) hotels don't belong in this list — this
+          // mirrors the Live vs Offboarded split on the platform-admin
+          // Customers pages.
+          .filter((p) => p.status !== "canceled");
 
         return Response.json({ properties: result });
       },
