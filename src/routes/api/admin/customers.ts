@@ -87,7 +87,7 @@ export const Route = createFileRoute("/api/admin/customers")({
             const appUrl = process.env.APP_URL ?? new URL(request.url).origin;
             const { data: invited, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(adminEmail, {
               data: { invited_property_id: property.id, full_name: adminName },
-              redirectTo: `${appUrl}/dashboard`,
+              redirectTo: `${appUrl}/set-password`,
             });
             if (inviteErr || !invited?.user) return bad(inviteErr?.message ?? "Invite failed", 500);
 

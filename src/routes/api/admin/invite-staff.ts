@@ -70,7 +70,7 @@ export const Route = createFileRoute("/api/admin/invite-staff")({
 
         const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
           data: { invited_property_id: propertyId, full_name: fullName },
-          redirectTo: `${appUrl}/dashboard`,
+          redirectTo: `${appUrl}/set-password`,
         });
         if (inviteError) return new Response(inviteError.message, { status: 500 });
 
