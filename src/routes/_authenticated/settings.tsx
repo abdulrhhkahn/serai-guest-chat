@@ -67,6 +67,21 @@ function SettingsPage() {
     );
   }
 
+  return <SettingsForm form={form} setForm={setForm} saving={saving} setSaving={setSaving} uploading={uploading} setUploading={setUploading} qc={qc} />;
+}
+
+function SettingsForm({ form, setForm, saving, setSaving, uploading, setUploading, qc }: {
+  form: Property;
+  setForm: (f: Property) => void;
+  saving: boolean;
+  setSaving: (b: boolean) => void;
+  uploading: boolean;
+  setUploading: (b: boolean) => void;
+  qc: ReturnType<typeof useQueryClient>;
+}) {
+  const { data: plan } = usePlanTier(form.id);
+  const digestAllowed = !!plan?.growthOk;
+
   const guestUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/checkin/${form.slug}`;
 
   async function save() {
@@ -141,9 +156,20 @@ function SettingsPage() {
           <div><Label>Wifi password</Label><Input value={form.wifi_password ?? ""} onChange={(e) => setForm({ ...form, wifi_password: e.target.value })} /></div>
           <div><Label>Welcome message</Label><Textarea value={form.welcome_message ?? ""} onChange={(e) => setForm({ ...form, welcome_message: e.target.value })} rows={3} /></div>
           <div>
-            <Label>Weekly report email</Label>
-            <Input value={form.report_email ?? ""} onChange={(e) => setForm({ ...form, report_email: e.target.value })} placeholder="manager@hotel.com, frontdesk@hotel.com" />
-            <p className="text-[11px] text-muted-foreground mt-1">Comma-separated. Gets a weekly analytics summary. Leave blank to turn off.</p>
+            <Label>Add emails for weekly analytics report</Label>
+            <Input
+              value={form.report_email ?? ""}
+              onChange={(e) => setForm({ ...form, report_email: e.target.value })}
+              placeholder="manager@hotel.com, frontdesk@hotel.com"
+              disabled={!digestAllowed}
+            />
+            {digestAllowed ? (
+              <p className="text-[11px] text-muted-foreground mt-1">Comma-separated. Gets a weekly analytics summary. Leave blank to turn off.</p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Available on the Growth plan and above. <a href="/billing" className="underline">Upgrade to enable this</a>.
+              </p>
+            )}
           </div>
         </Card>
       </div>

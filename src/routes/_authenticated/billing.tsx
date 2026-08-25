@@ -388,7 +388,7 @@ function PlanCard({
             value={features.maxStaff ? String(features.maxStaff) : "Unlimited"}
           />
           <FeatureRow icon="analytics" label="Analytics" value={features.analytics ? "Reply mix, containment, wait times, CSAT" : "Not included"} />
-          <FeatureRow icon="digest" label="Weekly email digest" value={features.weeklyDigest ? "Included" : "Not included"} />
+          <FeatureRow icon="digest" label="Weekly analytics report email" value={features.weeklyDigest ? "Included" : "Not included"} />
           <FeatureRow
             icon="multiProperty"
             label={features.orgRollup ? "Multi-property" : "Property type"}
