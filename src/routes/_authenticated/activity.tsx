@@ -22,7 +22,7 @@ const ACTION_LABEL: Record<string, string> = {
 function ActivityPage() {
   const [range, setRange] = useState<keyof typeof RANGE_DAYS>("daily");
 
-  const { data: property } = useQuery({
+  const { data: property, isLoading: propertyLoading, isError: propertyError } = useQuery({
     queryKey: ["current-property"],
     queryFn: async () => {
       const { data: auth } = await supabase.auth.getUser();
@@ -30,6 +30,15 @@ function ActivityPage() {
       if (!prof?.property_id) return null;
       const { data: p } = await supabase.from("properties").select("id").eq("id", prof.property_id).maybeSingle();
       return p;
+    },
+  });
+
+  const { data: planOk, isLoading: planLoading } = useQuery({
+    queryKey: ["activity-plan-ok", property?.id],
+    enabled: !!property?.id,
+    queryFn: async () => {
+      const { data } = await supabase.rpc("property_has_plan_at_least", { _property_id: property!.id, min_tier: "growth" });
+      return !!data;
     },
   });
 
@@ -64,6 +73,36 @@ function ActivityPage() {
     }
     return [...map.entries()].sort((a, b) => b[1].length - a[1].length);
   }, [entries]);
+
+  // Fail closed, not open — same reasoning as Analytics: while we don't
+  // yet know the plan (still loading, or the property lookup failed),
+  // show nothing rather than the real activity data.
+  if (propertyLoading) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (propertyError || !property?.id) {
+    return (
+      <div className="p-6 max-w-md">
+        <p className="text-sm text-muted-foreground">Couldn't load your property. Try refreshing the page.</p>
+      </div>
+    );
+  }
+  if (planLoading) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (!planOk) {
+    return (
+      <div className="p-6 max-w-2xl">
+        <h1 className="font-serif text-3xl mb-2">Staff activity</h1>
+        <div className="rounded-lg border border-border p-6">
+          <p className="text-sm text-muted-foreground">
+            Staff activity tracking is available on the Growth plan and above.{" "}
+            <a href="/billing" className="underline">Upgrade to unlock this</a>.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-4xl space-y-4">
