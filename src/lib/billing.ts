@@ -24,6 +24,7 @@ export const PLAN_FEATURES: Record<
     maxConversationsPerMonth: number | null;
     maxStaff: number | null;
     mobileCheckin: boolean;
+    staffActivityLog: boolean;
   }
 > = {
   basic: {
@@ -35,6 +36,7 @@ export const PLAN_FEATURES: Record<
     maxConversationsPerMonth: 50,
     maxStaff: 2,
     mobileCheckin: true,
+    staffActivityLog: false,
   },
   growth: {
     channels: ["web", "sms", "whatsapp"],
@@ -45,6 +47,7 @@ export const PLAN_FEATURES: Record<
     maxConversationsPerMonth: null,
     maxStaff: 5,
     mobileCheckin: true,
+    staffActivityLog: true,
   },
   pro: {
     channels: ["web", "sms", "whatsapp"],
@@ -55,5 +58,6 @@ export const PLAN_FEATURES: Record<
     maxConversationsPerMonth: null,
     maxStaff: null,
     mobileCheckin: true,
+    staffActivityLog: true,
   },
 };
