@@ -175,7 +175,7 @@ function AuthedLayout() {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <Sidebar collapsible="icon">
-          <SidebarHeader className="border-b border-sidebar-border">
+          <SidebarHeader className="border-b border-sidebar-border h-16 justify-center">
             {(isAdmin || isOrgAdmin) && properties && properties.length > 0 ? (
               <DropdownMenu>
                 <Tooltip>
@@ -296,7 +296,7 @@ function AuthedLayout() {
         </Sidebar>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-12 flex items-center gap-2 border-b border-border px-3 bg-card/50">
+          <header className="h-16 flex items-center gap-2 border-b border-border px-3 bg-card/50">
             <SidebarTrigger title="Toggle sidebar" />
             <Separator orientation="vertical" className="h-4" />
             <div className="text-sm text-muted-foreground capitalize flex-1">
