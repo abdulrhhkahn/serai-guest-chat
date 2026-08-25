@@ -65,6 +65,7 @@ function PropertiesPage() {
                 <th className="px-4 py-3 font-medium">Property</th>
                 <th className="px-4 py-3 font-medium">Organisation</th>
                 <th className="px-4 py-3 font-medium">Plan</th>
+                <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Check-in link</th>
               </tr>
             </thead>
@@ -78,6 +79,11 @@ function PropertiesPage() {
                   <td className="px-4 py-3 font-medium text-foreground">{p.name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{p.organizationName ?? "—"}</td>
                   <td className="px-4 py-3 capitalize">{p.planTier}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-md px-2 py-0.5 text-xs capitalize ${p.status === "active" ? "bg-brand/15 text-brand" : "bg-muted text-muted-foreground"}`}>
+                      {p.status ?? "no subscription"}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground font-mono text-xs">/checkin/{p.slug}</td>
                 </tr>
               ))}
