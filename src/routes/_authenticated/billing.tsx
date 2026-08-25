@@ -245,6 +245,28 @@ function BookDemoForm({ tier, onClose }: { tier: PlanTier; onClose: () => void }
   const [selectedDay, setSelectedDay] = useState<Date>(availableDays[0]);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
 
+  // Which slots are already booked by anyone (any hotel) — fetched via a
+  // narrow server route that returns only timestamps, never the other
+  // leads' names/emails, since plan_interest_leads itself is admin-only
+  // to read directly.
+  const { data: takenSlots, refetch: refetchAvailability } = useQuery({
+    queryKey: ["demo-availability"],
+    queryFn: async (): Promise<Set<number>> => {
+      const { data: s } = await supabase.auth.getSession();
+      const from = availableDays[0];
+      const to = new Date(availableDays[availableDays.length - 1]);
+      to.setHours(23, 59, 59, 999);
+      const res = await fetch("/api/billing/demo-availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
+        body: JSON.stringify({ from: from.toISOString(), to: to.toISOString() }),
+      });
+      if (!res.ok) return new Set();
+      const body = await res.json();
+      return new Set((body.taken as string[]).map((t) => new Date(t).getTime()));
+    },
+  });
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [workEmail, setWorkEmail] = useState("");
@@ -288,7 +310,18 @@ function BookDemoForm({ tier, onClose }: { tier: PlanTier; onClose: () => void }
       toast.success(`Meeting scheduled for ${selectedSlot.date.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })} at ${selectedSlot.label}.`);
       onClose();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't schedule the meeting");
+      // 23505 = unique_violation — someone else took this exact slot
+      // between it loading and this submit (the race the DB constraint
+      // exists to catch). Send them back to pick a different one instead
+      // of showing a raw constraint error.
+      if (e && typeof e === "object" && "code" in e && (e as { code: string }).code === "23505") {
+        toast.error("That slot was just taken — pick another.");
+        setSelectedSlot(null);
+        setStep(1);
+        refetchAvailability();
+      } else {
+        toast.error(e instanceof Error ? e.message : "Couldn't schedule the meeting");
+      }
       setSubmitting(false);
     }
   }
@@ -333,20 +366,27 @@ function BookDemoForm({ tier, onClose }: { tier: PlanTier; onClose: () => void }
               ))}
             </div>
             <div className="grid grid-cols-4 gap-2">
-              {daySlots.map((slot) => (
-                <button
-                  key={slot.date.toISOString()}
-                  type="button"
-                  onClick={() => setSelectedSlot(slot)}
-                  className={`rounded-md border px-2 py-1.5 text-xs ${
-                    selectedSlot?.date.getTime() === slot.date.getTime()
-                      ? "border-brand bg-brand/10 text-brand"
-                      : "border-border hover:border-foreground/30"
-                  }`}
-                >
-                  {slot.label}
-                </button>
-              ))}
+              {daySlots.map((slot) => {
+                const isTaken = takenSlots?.has(slot.date.getTime()) ?? false;
+                return (
+                  <button
+                    key={slot.date.toISOString()}
+                    type="button"
+                    onClick={() => !isTaken && setSelectedSlot(slot)}
+                    disabled={isTaken}
+                    title={isTaken ? "Already booked" : undefined}
+                    className={`rounded-md border px-2 py-1.5 text-xs ${
+                      isTaken
+                        ? "border-border text-muted-foreground/50 line-through cursor-not-allowed bg-muted/30"
+                        : selectedSlot?.date.getTime() === slot.date.getTime()
+                        ? "border-brand bg-brand/10 text-brand"
+                        : "border-border hover:border-foreground/30"
+                    }`}
+                  >
+                    {slot.label}
+                  </button>
+                );
+              })}
             </div>
             <DialogFooter className="sm:justify-center">
               <Button onClick={() => setStep(2)} disabled={!selectedSlot}>
