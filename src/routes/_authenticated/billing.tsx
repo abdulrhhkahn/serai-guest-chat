@@ -330,7 +330,7 @@ function BookDemoForm({ tier, onClose }: { tier: PlanTier; onClose: () => void }
 
   return (
     <Dialog open onOpenChange={(open) => !open && !submitting && onClose()}>
-      <DialogContent className="sm:max-w-lg relative max-h-[85vh] overflow-y-auto" hideClose>
+      <DialogContent className="sm:max-w-lg relative top-8 translate-y-0 max-h-[85vh] overflow-y-auto" hideClose>
         <DialogClose
           disabled={submitting}
           className="absolute right-6 top-6 opacity-70 hover:opacity-100 disabled:pointer-events-none disabled:opacity-30"

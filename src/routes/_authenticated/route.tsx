@@ -176,7 +176,7 @@ function AuthedLayout() {
       <div className="min-h-screen flex w-full bg-background">
         <Sidebar collapsible="icon">
           <SidebarHeader className="border-b border-sidebar-border h-16 justify-center">
-            {(isAdmin || isOrgAdmin) && properties && properties.length > 0 ? (
+            {isOrgAdmin && properties && properties.length > 0 ? (
               <DropdownMenu>
                 <Tooltip>
                   <TooltipTrigger asChild>
