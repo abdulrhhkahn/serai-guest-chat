@@ -730,6 +730,41 @@ export type Database = {
           },
         ]
       }
+      staff_activity_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          detail: string | null
+          id: string
+          property_id: string
+          staff_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          property_id: string
+          staff_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          property_id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_activity_log_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_invites: {
         Row: {
           created_at: string
