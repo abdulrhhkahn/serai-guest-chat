@@ -185,7 +185,7 @@ function AuthedLayout() {
                         <div className="h-7 w-7 rounded-md flex-shrink-0" style={{ background: property?.brand_color ?? "#0b6b75" }} />
                         <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                           <div className="truncate text-sm font-serif">
-                            {property?.name ?? "Serai"}{planLabel && <span className="text-muted-foreground font-sans"> | {planLabel}</span>}
+                            {property?.name ?? "Serai"}{planLabel && <span className="text-muted-foreground font-sans text-xs"> | {planLabel}</span>}
                           </div>
                           <div className="truncate text-[11px] text-muted-foreground">Switch property ▾</div>
                         </div>
@@ -230,7 +230,7 @@ function AuthedLayout() {
                     <div className="h-7 w-7 rounded-md flex-shrink-0" style={{ background: property?.brand_color ?? "#0b6b75" }} />
                     <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                       <div className="truncate text-sm font-serif">
-                        {property?.name ?? "Serai"}{planLabel && <span className="text-muted-foreground font-sans"> | {planLabel}</span>}
+                        {property?.name ?? "Serai"}{planLabel && <span className="text-muted-foreground font-sans text-xs"> | {planLabel}</span>}
                       </div>
                       <div className="truncate text-[11px] text-muted-foreground">Staff dashboard</div>
                     </div>
