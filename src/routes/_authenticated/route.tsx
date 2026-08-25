@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Separator } from "@/components/ui/separator";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -103,6 +104,18 @@ function AuthedLayout() {
     },
   });
 
+  const { data: planLabel } = useQuery({
+    queryKey: ["current-property-plan-label", property?.id],
+    enabled: !!property?.id,
+    queryFn: async () => {
+      const [{ data: growthOk }, { data: proOk }] = await Promise.all([
+        supabase.rpc("property_has_plan_at_least", { _property_id: property!.id, min_tier: "growth" }),
+        supabase.rpc("property_has_plan_at_least", { _property_id: property!.id, min_tier: "pro" }),
+      ]);
+      return proOk ? "Pro Plan" : growthOk ? "Growth Plan" : "Basic Plan";
+    },
+  });
+
   const { data: properties } = useQuery({
     queryKey: ["all-properties", isAdmin, myOrgId],
     enabled: !!isAdmin || !!myOrgId,
@@ -171,7 +184,9 @@ function AuthedLayout() {
                       <button className="flex w-full items-center gap-2 px-2 py-2 hover:bg-sidebar-accent rounded-md transition text-left group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
                         <div className="h-7 w-7 rounded-md flex-shrink-0" style={{ background: property?.brand_color ?? "#0b6b75" }} />
                         <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                          <div className="truncate text-sm font-serif">{property?.name ?? "Serai"}</div>
+                          <div className="truncate text-sm font-serif">
+                            {property?.name ?? "Serai"}{planLabel && <span className="text-muted-foreground font-sans"> | {planLabel}</span>}
+                          </div>
                           <div className="truncate text-[11px] text-muted-foreground">Switch property ▾</div>
                         </div>
                       </button>
@@ -214,7 +229,9 @@ function AuthedLayout() {
                   <div className="flex items-center gap-2 px-2 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
                     <div className="h-7 w-7 rounded-md flex-shrink-0" style={{ background: property?.brand_color ?? "#0b6b75" }} />
                     <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                      <div className="truncate text-sm font-serif">{property?.name ?? "Serai"}</div>
+                      <div className="truncate text-sm font-serif">
+                        {property?.name ?? "Serai"}{planLabel && <span className="text-muted-foreground font-sans"> | {planLabel}</span>}
+                      </div>
                       <div className="truncate text-[11px] text-muted-foreground">Staff dashboard</div>
                     </div>
                   </div>
@@ -281,6 +298,7 @@ function AuthedLayout() {
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-12 flex items-center gap-2 border-b border-border px-3 bg-card/50">
             <SidebarTrigger title="Toggle sidebar" />
+            <Separator orientation="vertical" className="h-4" />
             <div className="text-sm text-muted-foreground capitalize flex-1">
               {pathname.replace("/", "") || "dashboard"}
             </div>
