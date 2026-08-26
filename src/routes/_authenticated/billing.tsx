@@ -22,6 +22,7 @@ import {
   Users,
   UserCheck,
   History,
+  Headphones,
   Calendar as CalendarIcon,
 } from "lucide-react";
 import { PLAN_FEATURES, PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
@@ -185,16 +186,17 @@ const FEATURE_ICON = {
   seats: Users,
   verify: UserCheck,
   activity: History,
+  chatSupport: Headphones,
 } as const;
 
 function FeatureRow({ icon, label, value }: { icon: keyof typeof FEATURE_ICON; label: string; value?: string }) {
   const IconComp = FEATURE_ICON[icon];
   return (
     <li className="flex items-start gap-2.5">
-      <span className="h-4 w-4 shrink-0 mt-0.5 flex items-center justify-center">
-        <IconComp className="h-3.5 w-3.5 text-brand" />
+      <span className="h-5 w-5 shrink-0 flex items-center justify-center">
+        <IconComp className="h-4 w-4 text-brand" strokeWidth={2} />
       </span>
-      <span className="text-sm text-muted-foreground">
+      <span className="text-sm text-muted-foreground leading-5">
         {value ? (
           <>
             <span className="font-medium text-foreground">{label} — </span>
@@ -538,6 +540,7 @@ function PlanCard({
             label="Property"
             value={features.orgRollup ? "Add properties, cross-property comparison" : "Single property"}
           />
+          <FeatureRow icon="chatSupport" label="24/7 chat support" value="Included" />
         </ul>
 
         <div className="mt-6 space-y-2">
