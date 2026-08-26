@@ -191,7 +191,9 @@ function FeatureRow({ icon, label, value }: { icon: keyof typeof FEATURE_ICON; l
   const IconComp = FEATURE_ICON[icon];
   return (
     <li className="flex items-start gap-2.5">
-      <IconComp className="h-4 w-4 text-brand shrink-0 mt-0.5" />
+      <span className="h-4 w-4 shrink-0 mt-0.5 flex items-center justify-center">
+        <IconComp className="h-3.5 w-3.5 text-brand" />
+      </span>
       <span className="text-sm text-muted-foreground">
         {value ? (
           <>
