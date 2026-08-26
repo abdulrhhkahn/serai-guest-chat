@@ -288,7 +288,7 @@ export const Route = createFileRoute("/api/admin/customers")({
 
             const { data: subRows, error: subErr } = await supabaseAdmin
               .from("subscriptions")
-              .select("organization_id, plan_tier, status, property_count, current_period_end")
+              .select("organization_id, plan_tier, status, property_count, current_period_end, created_at")
               .order("created_at", { ascending: false });
             if (subErr) return bad(subErr.message, 500);
 
