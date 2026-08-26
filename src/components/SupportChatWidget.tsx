@@ -41,6 +41,15 @@ export function SupportChatWidget({ propertyId, open, onOpenChange }: { property
     },
   });
 
+  // Opening the widget counts as read — clears the icon's notification
+  // dot regardless of whether staff actually send a reply.
+  useEffect(() => {
+    if (!open || !conversationId) return;
+    supabase.from("support_conversations").update({ needs_staff: false }).eq("id", conversationId).then(() => {
+      qc.invalidateQueries({ queryKey: ["support-needs-staff", propertyId] });
+    });
+  }, [open, conversationId, propertyId, qc]);
+
   const { data: messages, refetch } = useQuery({
     queryKey: ["support-messages", conversationId],
     enabled: !!conversationId,
@@ -113,7 +122,7 @@ export function SupportChatWidget({ propertyId, open, onOpenChange }: { property
             ))
           )}
         </div>
-        <div className="p-3 border-t border-border flex gap-2 items-end">
+        <div className="p-3 border-t border-border flex gap-2 items-center">
           <Textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -127,7 +136,7 @@ export function SupportChatWidget({ propertyId, open, onOpenChange }: { property
             className="min-h-[40px] max-h-24 resize-none"
             rows={1}
           />
-          <Button size="sm" onClick={send} disabled={!body.trim() || sending}>
+          <Button size="sm" className="shrink-0" onClick={send} disabled={!body.trim() || sending}>
             Send
           </Button>
         </div>
