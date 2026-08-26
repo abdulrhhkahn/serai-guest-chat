@@ -159,7 +159,7 @@ function BillingPage() {
             onBuyNow={(!noOrg && canManageBilling) || import.meta.env.DEV ? () => handleBuyNow(tier) : undefined}
             onBookDemo={() => setDemoFormTier(tier)}
             redirecting={redirecting === tier}
-            restrictedNote={!noOrg && !canManageBilling ? "Ask your hotel's admin to upgrade" : undefined}
+            restrictedNote={!noOrg && !canManageBilling && !import.meta.env.DEV ? "Ask your hotel's admin to upgrade" : undefined}
           />
         ))}
       </div>
