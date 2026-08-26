@@ -14,8 +14,18 @@ type Org = {
   id: string;
   name: string;
   properties: { id: string; name: string }[];
-  subscription: { plan_tier: string; status: string; property_count: number; current_period_end: string | null } | null;
+  subscription: { plan_tier: string; status: string; property_count: number; current_period_end: string | null; created_at?: string } | null;
 };
+
+// Tenure isn't stored explicitly — derived from how far the period end
+// sits from when the subscription started. ~1 year apart reads as
+// "1 year", anything shorter (including the standard 30-day activation)
+// reads as "30 days".
+function tenureLabel(sub: Org["subscription"]): string {
+  if (!sub?.current_period_end || !sub.created_at) return "—";
+  const days = (new Date(sub.current_period_end).getTime() - new Date(sub.created_at).getTime()) / 86_400_000;
+  return days >= 300 ? "1 year" : "30 days";
+}
 
 type OrgDetail = {
   org: { id: string; name: string };
@@ -95,6 +105,7 @@ export function CustomersTable({
                 <th className="px-4 py-3 font-medium">Hotel</th>
                 <th className="px-4 py-3 font-medium">Properties</th>
                 <th className="px-4 py-3 font-medium">Plan</th>
+                <th className="px-4 py-3 font-medium">Tenure</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Renews</th>
               </tr>
@@ -113,6 +124,7 @@ export function CustomersTable({
                       {org.properties.length === 0 ? "—" : org.properties.map((p) => p.name).join(", ")}
                     </td>
                     <td className="px-4 py-3 capitalize">{sub?.plan_tier ?? "basic"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{tenureLabel(sub)}</td>
                     <td className="px-4 py-3">
                       <span className={`rounded-md px-2 py-0.5 text-xs capitalize ${sub?.status === "active" ? "bg-brand/15 text-brand" : "bg-muted text-muted-foreground"}`}>
                         {sub?.status ?? "no subscription"}
