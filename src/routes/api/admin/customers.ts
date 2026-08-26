@@ -67,10 +67,14 @@ export const Route = createFileRoute("/api/admin/customers")({
             const adminName = body.adminName ? String(body.adminName).trim() : undefined;
             const adminEmail = String(body.adminEmail ?? "").trim();
             const planTier = body.planTier as PlanTier | "basic" | undefined;
+            const tenure = body.tenure as "30days" | "1year" | undefined;
             if (!hotelName) return bad("Hotel name required");
             if (!isValidEmail(adminEmail)) return bad("Invalid admin email");
             if (planTier && planTier !== "basic" && planTier !== "growth" && planTier !== "pro") {
               return bad("planTier must be basic, growth, or pro");
+            }
+            if (tenure && tenure !== "30days" && tenure !== "1year") {
+              return bad("tenure must be 30days or 1year");
             }
 
             const { data: org, error: orgErr } = await supabaseAdmin
@@ -106,7 +110,8 @@ export const Route = createFileRoute("/api/admin/customers")({
               const plan = PLAN_PRICING_PKR[planTier];
               amountPkr = plan.monthlyPkr;
               const periodEnd = new Date();
-              periodEnd.setDate(periodEnd.getDate() + 30);
+              if (tenure === "1year") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+              else periodEnd.setDate(periodEnd.getDate() + 30);
               const { error: subErr } = await supabaseAdmin.from("subscriptions").insert({
                 organization_id: org.id,
                 safepay_subscription_reference: `manual-${org.id}-${Date.now()}`,
