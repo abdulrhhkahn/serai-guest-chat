@@ -130,6 +130,16 @@ function ThreadView({ conversationId }: { conversationId: string }) {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Opening the conversation counts as read, independent of whether the
+  // admin actually replies — clears the badge/red-dot the moment it's
+  // viewed rather than leaving it on until a reply is sent.
+  useEffect(() => {
+    supabase.from("support_conversations").update({ needs_admin: false }).eq("id", conversationId).then(() => {
+      qc.invalidateQueries({ queryKey: ["support-threads"] });
+      qc.invalidateQueries({ queryKey: ["support-needs-admin-count"] });
+    });
+  }, [conversationId, qc]);
+
   const { data: messages, refetch } = useQuery({
     queryKey: ["support-messages", conversationId],
     queryFn: async (): Promise<SupportMessage[]> => {
@@ -190,7 +200,7 @@ function ThreadView({ conversationId }: { conversationId: string }) {
           </div>
         ))}
       </div>
-      <div className="p-3 border-t border-border flex gap-2 items-end">
+      <div className="p-3 border-t border-border flex gap-2 items-center">
         <Textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
@@ -204,7 +214,7 @@ function ThreadView({ conversationId }: { conversationId: string }) {
           className="min-h-[40px] max-h-24 resize-none"
           rows={1}
         />
-        <Button size="sm" onClick={send} disabled={!body.trim() || sending}>
+        <Button size="sm" className="shrink-0" onClick={send} disabled={!body.trim() || sending}>
           Send
         </Button>
       </div>
