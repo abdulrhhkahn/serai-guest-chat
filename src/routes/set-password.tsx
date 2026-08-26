@@ -14,13 +14,14 @@ export const Route = createFileRoute("/set-password")({
 
 /**
  * Where invite emails (staff and hotel-admin invites, see invite-staff.ts
- * and customers.ts's createHotel) redirect to after the person clicks
- * "Accept invitation." Supabase verifies the invite token on its own
- * server first, then redirects back here with a valid session already
- * attached in the URL — the browser's Supabase client picks that up
- * automatically on load. What it does NOT do is set a password; without
- * this page, the person is logged in for this one session only and can
- * never sign in again normally. This page is what actually sets one.
+ * and customers.ts's createHotel) AND password-reset emails (see auth.tsx's
+ * "Forgot password?") both redirect to. Both flows work identically from
+ * this page's point of view: Supabase verifies the token on its own server
+ * first, then redirects back here with a valid session already attached in
+ * the URL — the browser's Supabase client picks that up automatically on
+ * load. What neither flow does on its own is set a password; without this
+ * page, the person is logged in for this one session only and can never
+ * sign in again normally. This page is what actually sets one.
  */
 function SetPasswordPage() {
   const navigate = useNavigate();
