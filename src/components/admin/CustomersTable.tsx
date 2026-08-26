@@ -376,7 +376,7 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
                       {activating ? "Activating…" : "Activate 30 days"}
                     </Button>
                     <Button size="sm" onClick={() => activate(365)} disabled={activating}>
-                      {activating ? "Activating…" : "Activate for 1 year"}
+                      {activating ? "Activating…" : "Activate 1 year"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={deactivate} disabled={deactivating}>
                       {deactivating ? "Deactivating…" : "Deactivate"}
