@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect, useNavigate, Link, useRouterState } 
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarHeader, SidebarSeparator, useSidebar } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2, Table, History } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2, Table, History, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
@@ -13,6 +13,8 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Separator } from "@/components/ui/separator";
+import { SupportChatWidget } from "@/components/SupportChatWidget";
+import { playNotificationSound } from "@/lib/notification-sound";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -51,38 +53,13 @@ function CollapsedTooltipContent({ children, ...props }: React.ComponentProps<ty
   );
 }
 
-// Short two-tone beep, generated on the fly rather than shipping an audio
-// file. Browsers block audio from playing before any user interaction on
-// the page at all — this will silently no-op on a completely fresh
-// pageload until the person has clicked or typed something once, which
-// is a browser restriction, not a bug here.
-function playNotificationSound() {
-  try {
-    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    const now = ctx.currentTime;
-    [880, 660].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = freq;
-      osc.type = "sine";
-      gain.gain.setValueAtTime(0.001, now + i * 0.12);
-      gain.gain.exponentialRampToValueAtTime(0.15, now + i * 0.12 + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.15);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(now + i * 0.12);
-      osc.stop(now + i * 0.12 + 0.16);
-    });
-  } catch {
-    /* best-effort — some browsers/contexts may block this entirely */
-  }
-}
-
 function AuthedLayout() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [supportOpen, setSupportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const { data: isAdmin } = useQuery({
@@ -390,6 +367,11 @@ function AuthedLayout() {
                 <History className="h-4 w-4" />
               </Button>
             </Link>
+            {property?.id && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" title="Chat with support" onClick={() => setSupportOpen(true)}>
+                <MessageCircle className="h-4 w-4" />
+              </Button>
+            )}
             <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto">
@@ -397,6 +379,10 @@ function AuthedLayout() {
           </main>
         </div>
       </div>
+
+      {property?.id && (
+        <SupportChatWidget propertyId={property.id} open={supportOpen} onOpenChange={setSupportOpen} />
+      )}
 
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent>
