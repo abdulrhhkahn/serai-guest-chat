@@ -171,6 +171,53 @@ function AuthedLayout() {
     return () => { supabase.removeChannel(ch); };
   }, [property?.id, refetchUnread]);
 
+  // Whether the property's support thread has an admin reply staff
+  // haven't opened yet — powers the red dot on the chat icon. Live from
+  // any page, same as the Inbox badge above, not just while the widget
+  // itself happens to be open.
+  const { data: hasSupportReply, refetch: refetchSupportReply } = useQuery({
+    queryKey: ["support-needs-staff", property?.id],
+    enabled: !!property?.id,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("support_conversations")
+        .select("id", { count: "exact", head: true })
+        .eq("property_id", property!.id)
+        .eq("needs_staff", true);
+      return (count ?? 0) > 0;
+    },
+  });
+
+  useEffect(() => {
+    if (!property?.id) return;
+    const ch = supabase
+      .channel("layout-support")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "support_messages" },
+        async (payload) => {
+          const row = payload.new as { sender?: string; conversation_id?: string; body?: string };
+          if (row.sender !== "admin") return;
+          const { data: conv } = await supabase
+            .from("support_conversations")
+            .select("property_id")
+            .eq("id", row.conversation_id ?? "")
+            .maybeSingle();
+          if (conv?.property_id !== property.id) return;
+          toast.info("New message from Serai support", {
+            description: row.body ? row.body.slice(0, 80) : undefined,
+          });
+          playNotificationSound();
+          refetchSupportReply();
+        },
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "support_conversations" }, () => {
+        refetchSupportReply();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [property?.id, refetchSupportReply]);
+
   const { data: properties } = useQuery({
     queryKey: ["all-properties", isAdmin, myOrgId],
     enabled: !!isAdmin || !!myOrgId,
@@ -368,8 +415,11 @@ function AuthedLayout() {
               </Button>
             </Link>
             {property?.id && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" title="Chat with support" onClick={() => setSupportOpen(true)}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 relative" title="Chat with support" onClick={() => setSupportOpen(true)}>
                 <MessageCircle className="h-4 w-4" />
+                {hasSupportReply && (
+                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
+                )}
               </Button>
             )}
             <ThemeToggle />
