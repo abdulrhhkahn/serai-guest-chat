@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -240,6 +240,7 @@ function levelAllowed(level: string, plan?: { growthOk: boolean; proOk: boolean 
 
 function AutonomyCard({ propertyId }: { propertyId: string }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { data: plan } = usePlanTier(propertyId);
   const { data } = useQuery({
     queryKey: ["autonomy", propertyId],
@@ -286,9 +287,19 @@ function AutonomyCard({ propertyId }: { propertyId: string }) {
       </div>
       <div>
         <Label>Default</Label>
-        <select value={def} onChange={(e) => setDef(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm">
+        <select
+          value={def}
+          onChange={(e) => {
+            if (!levelAllowed(e.target.value, plan)) {
+              navigate({ to: "/billing" });
+              return;
+            }
+            setDef(e.target.value);
+          }}
+          className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+        >
           {LEVELS.map(([v, l]) => (
-            <option key={v} value={v} disabled={!levelAllowed(v, plan)}>
+            <option key={v} value={v}>
               {l}{!levelAllowed(v, plan) ? " (upgrade required)" : ""}
             </option>
           ))}
@@ -302,11 +313,17 @@ function AutonomyCard({ propertyId }: { propertyId: string }) {
               <span className="text-sm flex-1 truncate">{cat}</span>
               <select
                 value={rules[cat] ?? def}
-                onChange={(e) => setRules((prev) => ({ ...prev, [cat]: e.target.value }))}
+                onChange={(e) => {
+                  if (!levelAllowed(e.target.value, plan)) {
+                    navigate({ to: "/billing" });
+                    return;
+                  }
+                  setRules((prev) => ({ ...prev, [cat]: e.target.value }));
+                }}
                 className="h-9 w-40 rounded-md border border-border bg-background px-2 text-sm"
               >
                 {LEVELS.map(([v, l]) => (
-                  <option key={v} value={v} disabled={!levelAllowed(v, plan)}>
+                  <option key={v} value={v}>
                     {l}{!levelAllowed(v, plan) ? " (upgrade)" : ""}
                   </option>
                 ))}
