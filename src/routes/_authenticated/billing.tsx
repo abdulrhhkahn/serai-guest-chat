@@ -47,7 +47,7 @@ const TIER_DESCRIPTION: Record<"basic" | PlanTier, string> = {
 
 async function startCheckout(orgId: string, tier: PlanTier) {
   const { data: s } = await supabase.auth.getSession();
-  const res = await fetch("/api/billing/checkout", {
+  const res = await fetch("/api/admin/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
     body: JSON.stringify({ orgId, tier }),
