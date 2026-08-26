@@ -7,7 +7,7 @@ import { PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
  * POST body: { orgId, tier: "growth" | "pro" }
  * Returns { url } to redirect the browser to for Safepay checkout.
  */
-export const Route = createFileRoute("/api/billing/checkout")({
+export const Route = createFileRoute("/api/admin/checkout")({
   server: {
     handlers: {
       POST: async ({ request }) => {
