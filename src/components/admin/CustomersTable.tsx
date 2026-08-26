@@ -160,6 +160,7 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [removingAdminId, setRemovingAdminId] = useState<string | null>(null);
   const [tier, setTier] = useState<"basic" | PlanTier>("basic");
+  const [tenure, setTenure] = useState<"30days" | "1year">("30days");
   const [propertyCount, setPropertyCount] = useState(1);
   const [activating, setActivating] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
@@ -212,14 +213,14 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
   // one that was deactivated. This is deliberately NOT the same action as
   // Deactivate: choosing Basic here means "stay/become a live customer on
   // the free tier," not "offboard them."
-  async function activate() {
+  async function activate(days: 30 | 365) {
     setActivating(true);
     try {
       if (tier === "basic") {
         await callAdmin({ action: "clearSubscription", orgId });
         toast.success("Live on Basic");
       } else {
-        const res = await callAdmin({ action: "activateSubscription", orgId, planTier: tier, propertyCount });
+        const res = await callAdmin({ action: "activateSubscription", orgId, planTier: tier, propertyCount, periodDays: days });
         toast.success(`Activated — PKR ${res.amountPkr?.toLocaleString()}/mo`);
       }
       refetch();
@@ -268,7 +269,8 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
   }
 
   const sub = data?.subscription;
-  const amount = tier === "basic" ? 0 : PLAN_PRICING_PKR[tier].monthlyPkr * propertyCount;
+  const monthlyAmount = tier === "basic" ? 0 : PLAN_PRICING_PKR[tier].monthlyPkr * propertyCount;
+  const amount = tenure === "1year" ? monthlyAmount * 12 : monthlyAmount;
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -352,16 +354,29 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
                       </Select>
                     </div>
                     <div>
+                      <Label className="text-xs">Tenure</Label>
+                      <Select value={tenure} onValueChange={(v) => setTenure(v as "30days" | "1year")} disabled={tier === "basic"}>
+                        <SelectTrigger className="w-28 mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="30days">30 days</SelectItem>
+                          <SelectItem value="1year">1 year</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
                       <Label className="text-xs">Properties</Label>
                       <Input type="number" min={1} value={propertyCount} onChange={(e) => setPropertyCount(Math.max(1, Number(e.target.value)))} className="w-20 mt-1" disabled={tier === "basic"} />
                     </div>
                     <p className="text-sm text-muted-foreground flex-1">
-                      {tier === "basic" ? "Free" : `PKR ${amount.toLocaleString()}/mo`}
+                      {tier === "basic" ? "Free" : `PKR ${amount.toLocaleString()}${tenure === "1year" ? "/yr" : "/mo"}`}
                     </p>
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button size="sm" onClick={activate} disabled={activating}>
+                    <Button size="sm" onClick={() => activate(30)} disabled={activating}>
                       {activating ? "Activating…" : "Activate 30 days"}
+                    </Button>
+                    <Button size="sm" onClick={() => activate(365)} disabled={activating}>
+                      {activating ? "Activating…" : "Activate for 1 year"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={deactivate} disabled={deactivating}>
                       {deactivating ? "Deactivating…" : "Deactivate"}
