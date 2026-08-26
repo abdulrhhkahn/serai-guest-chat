@@ -8,7 +8,7 @@ export type Json =
 
 export type Database = {
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -574,6 +574,7 @@ export type Database = {
           heard_about: string | null
           id: string
           last_name: string
+          meeting_slot: string | null
           phone: string
           plan_tier: string
           property_count: number
@@ -588,6 +589,7 @@ export type Database = {
           heard_about?: string | null
           id?: string
           last_name: string
+          meeting_slot?: string | null
           phone: string
           plan_tier: string
           property_count: number
@@ -602,6 +604,7 @@ export type Database = {
           heard_about?: string | null
           id?: string
           last_name?: string
+          meeting_slot?: string | null
           phone?: string
           plan_tier?: string
           property_count?: number
@@ -882,6 +885,76 @@ export type Database = {
           },
         ]
       }
+      support_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          last_message_at: string
+          needs_admin: boolean
+          property_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          needs_admin?: boolean
+          property_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          needs_admin?: boolean
+          property_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_conversations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          sender: string
+          sender_id: string | null
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          sender: string
+          sender_id?: string | null
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          sender?: string
+          sender_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "support_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -939,6 +1012,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin_of_org: { Args: { _org_id: string }; Returns: boolean }
       is_org_admin_for_property: {
         Args: { _property_id: string }
         Returns: boolean
