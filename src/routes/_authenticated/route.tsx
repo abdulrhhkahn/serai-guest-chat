@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Separator } from "@/components/ui/separator";
@@ -49,6 +49,32 @@ function CollapsedTooltipContent({ children, ...props }: React.ComponentProps<ty
       {children}
     </TooltipContent>
   );
+}
+
+// Short two-tone beep, generated on the fly rather than shipping an audio
+// file. Browsers block audio from playing before any user interaction on
+// the page at all — this will silently no-op on a completely fresh
+// pageload until the person has clicked or typed something once, which
+// is a browser restriction, not a bug here.
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const now = ctx.currentTime;
+    [880, 660].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.001, now + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.15, now + i * 0.12 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.15);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now + i * 0.12);
+      osc.stop(now + i * 0.12 + 0.16);
+    });
+  } catch {
+    /* best-effort — some browsers/contexts may block this entirely */
+  }
 }
 
 function AuthedLayout() {
@@ -115,6 +141,58 @@ function AuthedLayout() {
       return proOk ? "Pro Plan" : growthOk ? "Growth Plan" : "Basic Plan";
     },
   });
+
+  // Unread = conversations currently flagged needs_staff, i.e. awaiting a
+  // reply — the same concept the Inbox page itself already uses for its
+  // own "needs attention" filter, reused here so the badge means the same
+  // thing wherever it's shown. Lives at this layout level (not inside
+  // inbox.tsx) specifically so it's visible and stays live from any page.
+  const { data: unreadCount, refetch: refetchUnread } = useQuery({
+    queryKey: ["unread-count", property?.id],
+    enabled: !!property?.id,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("conversations")
+        .select("id", { count: "exact", head: true })
+        .eq("property_id", property!.id)
+        .eq("needs_staff", true);
+      return count ?? 0;
+    },
+  });
+
+  useEffect(() => {
+    if (!property?.id) return;
+    const ch = supabase
+      .channel("layout-unread")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages" },
+        async (payload) => {
+          const row = payload.new as { sender?: string; conversation_id?: string; body?: string };
+          if (row.sender !== "guest") return;
+          // Confirm this message's conversation belongs to the currently
+          // viewed property before alerting — the INSERT subscription
+          // itself isn't property-scoped, RLS just limits which rows this
+          // client can even receive in the first place.
+          const { data: conv } = await supabase
+            .from("conversations")
+            .select("property_id, guest_name")
+            .eq("id", row.conversation_id ?? "")
+            .maybeSingle();
+          if (conv?.property_id !== property.id) return;
+          toast.info(`New message from ${conv.guest_name || "a guest"}`, {
+            description: row.body ? row.body.slice(0, 80) : undefined,
+          });
+          playNotificationSound();
+          refetchUnread();
+        },
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
+        refetchUnread();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [property?.id, refetchUnread]);
 
   const { data: properties } = useQuery({
     queryKey: ["all-properties", isAdmin, myOrgId],
@@ -251,7 +329,12 @@ function AuthedLayout() {
                       <SidebarMenuButton asChild isActive={pathname === item.to} tooltip={item.label}>
                         <Link to={item.to} className="flex items-center gap-2">
                           <item.icon className={`h-4 w-4 ${pathname === item.to ? "text-brand" : ""}`} />
-                          <span>{item.label}</span>
+                          <span className="flex-1">{item.label}</span>
+                          {item.to === "/inbox" && !!unreadCount && (
+                            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-medium text-destructive-foreground">
+                              {unreadCount > 99 ? "99+" : unreadCount}
+                            </span>
+                          )}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
