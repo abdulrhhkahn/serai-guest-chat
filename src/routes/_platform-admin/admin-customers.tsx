@@ -166,7 +166,7 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
             </Select>
           </div>
           <div>
-            <Label className="text-xs">Tenure</Label>
+            <Label className="text-xs">Tenure <span className="text-destructive">*</span></Label>
             <Select value={tenure} onValueChange={(v) => setTenure(v as "30days" | "1year")} disabled={planTier === "basic"}>
               <SelectTrigger className="mt-1 w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
