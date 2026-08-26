@@ -97,6 +97,7 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [planTier, setPlanTier] = useState<"basic" | PlanTier>("basic");
+  const [tenure, setTenure] = useState<"30days" | "1year">("30days");
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -109,16 +110,18 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
         adminName: adminName.trim() || undefined,
         adminEmail: adminEmail.trim(),
         planTier,
+        tenure: planTier === "basic" ? undefined : tenure,
       });
       toast.success(
         res.amountPkr
-          ? `${hotelName.trim()} created on ${planTier} (PKR ${res.amountPkr.toLocaleString()}/mo) — login details sent to ${adminEmail.trim()}`
+          ? `${hotelName.trim()} created on ${planTier} (PKR ${res.amountPkr.toLocaleString()}/mo, ${tenure === "1year" ? "1 year" : "30 days"}) — login details sent to ${adminEmail.trim()}`
           : `${hotelName.trim()} created — login details sent to ${adminEmail.trim()}`,
       );
       setHotelName("");
       setAdminName("");
       setAdminEmail("");
       setPlanTier("basic");
+      setTenure("30days");
       onDone();
     } catch (e) {
       toast.error(String((e as Error).message));
@@ -150,16 +153,28 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
             <Input className="mt-1" type="email" placeholder="owner@cedarinn.com" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
           </div>
         </div>
-        <div>
-          <Label className="text-xs">Plan <span className="text-destructive">*</span></Label>
-          <Select value={planTier} onValueChange={(v) => setPlanTier(v as "basic" | PlanTier)}>
-            <SelectTrigger className="mt-1 w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="basic">Basic (free)</SelectItem>
-              <SelectItem value="growth">Growth</SelectItem>
-              <SelectItem value="pro">Pro</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label className="text-xs">Plan <span className="text-destructive">*</span></Label>
+            <Select value={planTier} onValueChange={(v) => setPlanTier(v as "basic" | PlanTier)}>
+              <SelectTrigger className="mt-1 w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="basic">Basic (free)</SelectItem>
+                <SelectItem value="growth">Growth</SelectItem>
+                <SelectItem value="pro">Pro</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Tenure</Label>
+            <Select value={tenure} onValueChange={(v) => setTenure(v as "30days" | "1year")} disabled={planTier === "basic"}>
+              <SelectTrigger className="mt-1 w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="30days">30 days</SelectItem>
+                <SelectItem value="1year">1 year</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <Button onClick={save} disabled={saving || !hotelName.trim() || !adminEmail.trim()}>
           {saving ? "Saving…" : "Save & send login details"}
