@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { setRememberMePreference } from "@/integrations/supabase/remember-me-storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/PasswordInput";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
 import { GuestTurnstile } from "@/components/GuestTurnstile";
@@ -27,6 +29,8 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [resetting, setResetting] = useState(false);
   // Reused from the guest chat — renders nothing unless VITE_TURNSTILE_SITE_KEY
   // is set. Also enable CAPTCHA protection in Supabase's own dashboard
   // (Authentication → Attack Protection) with the matching secret — passing
@@ -36,6 +40,10 @@ function AuthPage() {
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    // Must be set before signInWithPassword — that call is what actually
+    // writes the session, and the storage adapter reads this preference
+    // at that moment to decide where it goes.
+    setRememberMePreference(rememberMe);
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -47,6 +55,19 @@ function AuthPage() {
     // password was wrong — avoids confirming which accounts exist.
     if (error) return toast.error("Invalid email or password.");
     navigate({ to: "/dashboard" });
+  }
+
+  async function forgotPassword() {
+    if (!email.trim()) return toast.error("Enter your email above first, then click \"Forgot password?\"");
+    setResetting(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/set-password`,
+    });
+    setResetting(false);
+    // Same generic message regardless of outcome — doesn't confirm
+    // whether that email has an account.
+    toast.success("If that email has an account, a reset link is on its way.");
+    if (error) console.error(error);
   }
 
   return (
@@ -79,7 +100,17 @@ function AuthPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <button
+                    type="button"
+                    onClick={forgotPassword}
+                    disabled={resetting}
+                    className="text-xs text-muted-foreground hover:text-foreground underline disabled:opacity-50"
+                  >
+                    {resetting ? "Sending…" : "Forgot password?"}
+                  </button>
+                </div>
                 <PasswordInput
                   id="password"
                   required
@@ -87,6 +118,12 @@ function AuthPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="remember-me" checked={rememberMe} onCheckedChange={(v) => setRememberMe(v === true)} />
+                <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
+                  Remember me
+                </Label>
               </div>
               <GuestTurnstile onToken={setCaptchaToken} />
               <Button type="submit" className="w-full" disabled={loading}>
