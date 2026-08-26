@@ -891,6 +891,7 @@ export type Database = {
           id: string
           last_message_at: string
           needs_admin: boolean
+          needs_staff: boolean
           property_id: string
           status: string
         }
@@ -899,6 +900,7 @@ export type Database = {
           id?: string
           last_message_at?: string
           needs_admin?: boolean
+          needs_staff?: boolean
           property_id: string
           status?: string
         }
@@ -907,6 +909,7 @@ export type Database = {
           id?: string
           last_message_at?: string
           needs_admin?: boolean
+          needs_staff?: boolean
           property_id?: string
           status?: string
         }
