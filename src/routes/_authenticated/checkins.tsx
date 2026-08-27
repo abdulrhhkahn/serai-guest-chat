@@ -41,6 +41,12 @@ type Checkin = {
   created_at: string;
 };
 
+const STATUS_COLOR: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-900",
+  verified: "bg-blue-100 text-blue-900",
+  completed: "bg-emerald-100 text-emerald-900",
+};
+
 function dateGroupLabel(dateStr: string | null): string {
   if (!dateStr) return "No arrival date";
   const d = new Date(dateStr);
@@ -180,7 +186,7 @@ function CheckinsPage() {
                       <TableCell>{c.arrival_date ? format(new Date(c.arrival_date), "MMM d") : "—"}</TableCell>
                       <TableCell>{c.departure_date ? format(new Date(c.departure_date), "MMM d") : "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{c.booking_reference ?? "—"}</TableCell>
-                      <TableCell><span className="rounded-full bg-muted px-2 py-0.5 text-xs">{c.status}</span></TableCell>
+                      <TableCell><span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_COLOR[c.status] ?? "bg-muted"}`}>{c.status}</span></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

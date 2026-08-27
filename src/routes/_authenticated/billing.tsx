@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { GuestTurnstile } from "@/components/GuestTurnstile";
 import { toast } from "sonner";
 import {
-  MessageSquare,
+  Radio,
   Bot,
   BarChart3,
   LineChart,
@@ -176,7 +176,7 @@ function BillingPage() {
 }
 
 const FEATURE_ICON = {
-  channels: MessageSquare,
+  channels: Radio,
   ai: Bot,
   conversations: BarChart3,
   analytics: LineChart,
@@ -193,10 +193,10 @@ function FeatureRow({ icon, label, value }: { icon: keyof typeof FEATURE_ICON; l
   const IconComp = FEATURE_ICON[icon];
   return (
     <li className="flex items-start gap-2.5">
-      <span className="h-5 w-5 shrink-0 flex items-center justify-center">
-        <IconComp className="h-4 w-4 text-brand" strokeWidth={2} />
+      <span className="h-6 w-6 shrink-0 flex items-center justify-center">
+        <IconComp className="h-5 w-5 text-brand" strokeWidth={2} />
       </span>
-      <span className="text-sm text-muted-foreground leading-5">
+      <span className="text-sm text-muted-foreground leading-6">
         {value ? (
           <>
             <span className="font-medium text-foreground">{label} — </span>
