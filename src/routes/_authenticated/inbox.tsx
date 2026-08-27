@@ -46,6 +46,8 @@ type Message = {
   original_draft: string | null;
   delivery_status: string | null;
   delivery_error: string | null;
+  edited_at: string | null;
+  deleted_at: string | null;
 };
 
 type Template = { id: string; title: string; body: string; category: string | null };
@@ -86,6 +88,16 @@ function InboxPage() {
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editMsgText, setEditMsgText] = useState("");
+
+  const { data: myUserId } = useQuery({
+    queryKey: ["my-user-id"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return data.user?.id ?? null;
+    },
+  });
   const [threshold, setThreshold] = useState(0.5);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
@@ -339,6 +351,27 @@ function InboxPage() {
       });
       qc.invalidateQueries({ queryKey: ["messages", m.conversation_id] });
     } catch { /* best-effort */ }
+  }
+
+  function startEditMsg(m: Message) {
+    setEditingMsgId(m.id);
+    setEditMsgText(m.body);
+  }
+
+  async function saveEditMsg(conversationId: string) {
+    if (!editingMsgId) return;
+    const body = editMsgText.trim();
+    if (!body) return;
+    const { error } = await supabase.from("messages").update({ body, edited_at: new Date().toISOString() }).eq("id", editingMsgId);
+    if (error) return toast.error(error.message);
+    setEditingMsgId(null);
+    qc.invalidateQueries({ queryKey: ["messages", conversationId] });
+  }
+
+  async function unsendMsg(id: string, conversationId: string) {
+    const { error } = await supabase.from("messages").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["messages", conversationId] });
   }
 
   async function sendTo(conversationId: string, body: string, source: "manual" | "ai_draft_approved" | "ai_draft_edited" | "template", originalDraft?: string | null) {
@@ -660,18 +693,43 @@ function InboxPage() {
 
 
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-background">
-              {messages?.map((m) => (
-                <div key={m.id} className={`flex ${m.sender === "staff" ? "justify-end" : "justify-start"}`}>
+              {messages?.map((m) => {
+                const isMine = m.sender === "staff" && m.sender_user_id === myUserId;
+                return (
+                <div key={m.id} className={`group flex ${m.sender === "staff" ? "justify-end" : "justify-start"}`}>
+                  {isMine && !m.deleted_at && editingMsgId !== m.id && (
+                    <div className="hidden group-hover:flex items-center gap-1.5 mr-1.5 self-center">
+                      <button onClick={() => startEditMsg(m)} className="text-[10px] text-muted-foreground hover:text-foreground underline">Edit</button>
+                      <button onClick={() => unsendMsg(m.id, m.conversation_id)} className="text-[10px] text-muted-foreground hover:text-destructive underline">Unsend</button>
+                    </div>
+                  )}
+                  {editingMsgId === m.id ? (
+                    <div className="max-w-[75%] w-full space-y-1.5">
+                      <Input
+                        value={editMsgText}
+                        onChange={(e) => setEditMsgText(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveEditMsg(m.conversation_id); if (e.key === "Escape") setEditingMsgId(null); }}
+                        autoFocus
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={() => setEditingMsgId(null)} className="text-xs text-muted-foreground underline">Cancel</button>
+                        <button onClick={() => saveEditMsg(m.conversation_id)} className="text-xs underline text-primary">Save</button>
+                      </div>
+                    </div>
+                  ) : (
                   <div className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${
                     m.sender === "staff"
                       ? "bg-primary text-primary-foreground"
                       : m.sender === "ai"
                         ? "bg-blue-50 text-blue-900 border border-blue-200"
                         : "bg-card border border-border"
-                  }`}>
+                  } ${m.deleted_at ? "opacity-60 italic" : ""}`}>
                     {m.sender === "ai" && <div className="text-[10px] uppercase tracking-wide mb-1 opacity-70">AI · guest concierge</div>}
-                    <div className="whitespace-pre-wrap">{m.body}</div>
-                    {(() => {
+                    <div className="whitespace-pre-wrap">
+                      {m.deleted_at ? "This message was deleted" : m.body}
+                      {m.edited_at && !m.deleted_at && <span className="text-[10px] opacity-60 ml-1">(edited)</span>}
+                    </div>
+                    {!m.deleted_at && (() => {
                       if (m.sender === "guest") return null;
                       const d = deliveryLabel(m.delivery_status, m.delivery_error);
                       if (d.tone === "none") return null;
@@ -686,8 +744,10 @@ function InboxPage() {
                       );
                     })()}
                   </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="border-t border-border p-4 space-y-3 bg-card/30">
