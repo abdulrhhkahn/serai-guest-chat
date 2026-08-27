@@ -439,8 +439,10 @@ export type Database = {
           client_msg_id: string | null
           conversation_id: string
           created_at: string
+          deleted_at: string | null
           delivery_error: string | null
           delivery_status: string | null
+          edited_at: string | null
           external_id: string | null
           id: string
           is_ai_suggestion: boolean
@@ -455,8 +457,10 @@ export type Database = {
           client_msg_id?: string | null
           conversation_id: string
           created_at?: string
+          deleted_at?: string | null
           delivery_error?: string | null
           delivery_status?: string | null
+          edited_at?: string | null
           external_id?: string | null
           id?: string
           is_ai_suggestion?: boolean
@@ -471,8 +475,10 @@ export type Database = {
           client_msg_id?: string | null
           conversation_id?: string
           created_at?: string
+          deleted_at?: string | null
           delivery_error?: string | null
           delivery_status?: string | null
+          edited_at?: string | null
           external_id?: string | null
           id?: string
           is_ai_suggestion?: boolean
