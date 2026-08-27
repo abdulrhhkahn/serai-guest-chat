@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Sparkles, Send, FileText, Users, History, AlertTriangle, Clock, CheckCircle2, Search } from "lucide-react";
+import { Sparkles, Send, FileText, Users, History, AlertTriangle, Clock, CheckCircle2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { logActivity } from "@/lib/activity-log";
@@ -104,8 +104,17 @@ function InboxPage() {
     },
   });
 
+  // Only auto-selects the first conversation once, on initial load —
+  // without this guard, closing a conversation (setActiveId to null)
+  // would immediately re-trigger this same effect and select right back
+  // into the first one, making a close button impossible.
+  const hasAutoSelectedRef = useRef(false);
   useEffect(() => {
-    if (!activeId && conversations?.length) setActiveId(conversations[0].id);
+    if (hasAutoSelectedRef.current) return;
+    if (!activeId && conversations?.length) {
+      setActiveId(conversations[0].id);
+      hasAutoSelectedRef.current = true;
+    }
   }, [conversations, activeId]);
 
   const { data: messages } = useQuery({
@@ -537,11 +546,25 @@ function InboxPage() {
         ) : (
           <div className="divide-y divide-border">
             {attentionQueue.map(({ conv: c, flagged, awaiting, since }) => (
-              <button
+              <div
                 key={c.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => setActiveId(c.id)}
-                className={`w-full text-left p-4 hover:bg-accent transition ${activeId === c.id ? "bg-accent" : ""} ${flagged ? "border-l-2 border-l-amber-400" : ""}`}
+                onKeyDown={(e) => { if (e.key === "Enter") setActiveId(c.id); }}
+                className={`relative w-full text-left p-4 pr-9 cursor-pointer hover:bg-accent transition ${activeId === c.id ? "bg-accent" : ""} ${flagged ? "border-l-2 border-l-amber-400" : ""}`}
               >
+                <button
+                  type="button"
+                  title="Close"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (activeId === c.id) setActiveId(null);
+                  }}
+                  className="absolute top-3 right-3 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-background"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-medium truncate">{c.guest_name || "Guest"}</div>
                   <div className="flex items-center gap-1.5">
@@ -560,7 +583,7 @@ function InboxPage() {
                     {awaiting || flagged ? "waiting " : ""}{formatDistanceToNow(new Date(since), { addSuffix: !(awaiting || flagged) })}
                   </div>
                 )}
-              </button>
+              </div>
             ))}
           </div>
         )}
@@ -622,6 +645,15 @@ function InboxPage() {
                 )}
                 <Button variant="outline" size="sm" onClick={() => setAuditOpen(true)}>
                   <History className="h-3.5 w-3.5 mr-1.5" /> Audit
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  title="Close conversation"
+                  onClick={() => setActiveId(null)}
+                >
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
             </div>
