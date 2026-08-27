@@ -51,7 +51,7 @@ export const Route = createFileRoute("/stay/$slug")({
   component: StayHub,
 });
 
-type Msg = { id: string; sender: string; body: string; created_at: string };
+type Msg = { id: string; sender: string; body: string; created_at: string; edited_at?: string | null; deleted_at?: string | null };
 
 function StayHub() {
   const { property, offline } = Route.useLoaderData() as { property: StayProperty; offline: boolean };
@@ -224,6 +224,15 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
             );
           }
         })
+      // Edits and unsends are UPDATEs on an existing row — without this,
+      // a guest editing or unsending a message on one device (or staff
+      // doing the same to their own message) would never reach the
+      // guest's other open tab/device live.
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
+        (payload) => {
+          const m = payload.new as Msg;
+          setMessages((prev) => prev.map((x) => (x.id === m.id ? m : x)));
+        })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations", filter: `id=eq.${conversationId}` },
         (payload) => {
           const next = payload.new as { needs_staff?: boolean; resolved_at?: string | null; status?: string };
@@ -330,6 +339,30 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
 
   function enqueue(body: string) {
     setPending((prev) => [...prev, { local_id: crypto.randomUUID(), body, created_at: new Date().toISOString(), seq: nextSeq(), attempts: 0 }]);
+  }
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+
+  function startEdit(m: Msg) {
+    setEditingId(m.id);
+    setEditText(m.body);
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+    const body = editText.trim();
+    if (!body) return;
+    const { error } = await supabase.from("messages").update({ body, edited_at: new Date().toISOString() }).eq("id", editingId);
+    if (error) return toast.error(error.message);
+    setMessages((prev) => prev.map((x) => (x.id === editingId ? { ...x, body, edited_at: new Date().toISOString() } : x)));
+    setEditingId(null);
+  }
+
+  async function unsend(id: string) {
+    const { error } = await supabase.from("messages").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+    if (error) return toast.error(error.message);
+    setMessages((prev) => prev.map((x) => (x.id === id ? { ...x, deleted_at: new Date().toISOString() } : x)));
   }
 
   async function send() {
@@ -440,17 +473,41 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
           </div>
         )}
         {messages.map((m) => (
-          <div key={m.id} className={`flex ${m.sender === "guest" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${
-              m.sender === "guest" ? "text-white" : "bg-muted"
-            }`} style={m.sender === "guest" ? { background: brand } : undefined}>
-              {m.sender !== "guest" && (
-                <div className="text-[10px] uppercase tracking-wide mb-0.5 opacity-60">
-                  {m.sender === "ai" ? "AI concierge" : "Our team"}
+          <div key={m.id} className={`group flex ${m.sender === "guest" ? "justify-end" : "justify-start"}`}>
+            {m.sender === "guest" && !m.deleted_at && (
+              <div className="hidden group-hover:flex items-center gap-1 mr-1.5 self-center">
+                <button onClick={() => startEdit(m)} className="text-[10px] text-muted-foreground hover:text-foreground underline">Edit</button>
+                <button onClick={() => unsend(m.id)} className="text-[10px] text-muted-foreground hover:text-destructive underline">Unsend</button>
+              </div>
+            )}
+            {editingId === m.id ? (
+              <div className="max-w-[80%] w-full space-y-1.5">
+                <Input
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditingId(null); }}
+                  autoFocus
+                />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setEditingId(null)} className="text-xs text-muted-foreground underline">Cancel</button>
+                  <button onClick={saveEdit} className="text-xs underline" style={{ color: brand }}>Save</button>
                 </div>
-              )}
-              {m.body}
-            </div>
+              </div>
+            ) : (
+              <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${
+                m.sender === "guest" ? "text-white" : "bg-muted"
+              } ${m.deleted_at ? "opacity-60 italic" : ""}`} style={m.sender === "guest" ? { background: brand } : undefined}>
+                {m.sender !== "guest" && (
+                  <div className="text-[10px] uppercase tracking-wide mb-0.5 opacity-60">
+                    {m.sender === "ai" ? "AI concierge" : "Our team"}
+                  </div>
+                )}
+                {m.deleted_at ? "This message was deleted" : m.body}
+                {m.edited_at && !m.deleted_at && (
+                  <span className="text-[10px] opacity-60 ml-1">(edited)</span>
+                )}
+              </div>
+            )}
           </div>
         ))}
         {pending.map((p) => (
