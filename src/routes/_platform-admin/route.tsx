@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { Shield, Building2, Users, UserX, MessageCircle, LogOut } from "lucide-react";
+import { Shield, Building2, Users, UserX, MessageCircle, CalendarClock, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
@@ -40,6 +40,7 @@ export const Route = createFileRoute("/_platform-admin")({
 });
 
 const nav = [
+  { to: "/admin-demo-requests", label: "Demo requests", icon: CalendarClock },
   { to: "/admin-customers", label: "Onboard customer", icon: Building2 },
   { to: "/admin-live-customers", label: "Live customers", icon: Users },
   { to: "/admin-offboarded-customers", label: "Offboarded customers", icon: UserX },
