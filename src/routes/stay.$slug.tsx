@@ -127,7 +127,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
   const [conversationId, setConversationId] = useState<string | null>(() =>
     typeof localStorage !== "undefined" ? localStorage.getItem(`serai-conv-${propertyId}`) : null
   );
-  const [name, setName] = useState<string>(() => (typeof localStorage !== "undefined" ? localStorage.getItem("serai-guest-name") || "" : ""));
+  const [name, setName] = useState<string>(() => (typeof localStorage !== "undefined" ? localStorage.getItem(`serai-guest-name-${propertyId}`) || "" : ""));
   const [namePrompted, setNamePrompted] = useState(!!name);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [needsStaff, setNeedsStaff] = useState(false);
@@ -414,7 +414,7 @@ function GuestChat({ propertyId, brand }: { propertyId: string; brand: string })
         <Input className="mt-3" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
         <Button className="mt-3 w-full" style={{ background: brand, color: "white" }} onClick={() => {
           if (!name.trim()) return toast.error("Please enter your name");
-          localStorage.setItem("serai-guest-name", name.trim());
+          localStorage.setItem(`serai-guest-name-${propertyId}`, name.trim());
           setNamePrompted(true);
         }}>Start chatting</Button>
       </div>
