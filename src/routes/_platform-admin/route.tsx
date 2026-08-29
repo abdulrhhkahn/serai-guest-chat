@@ -40,11 +40,11 @@ export const Route = createFileRoute("/_platform-admin")({
 });
 
 const nav = [
-  { to: "/admin-demo-requests", label: "Demo requests", icon: CalendarClock },
   { to: "/admin-customers", label: "Onboard customer", icon: Building2 },
   { to: "/admin-live-customers", label: "Live customers", icon: Users },
   { to: "/admin-offboarded-customers", label: "Offboarded customers", icon: UserX },
   { to: "/admin-support", label: "Support", icon: MessageCircle },
+  { to: "/admin-demo-requests", label: "Demo requests", icon: CalendarClock },
 ] as const;
 
 function PlatformAdminLayout() {
