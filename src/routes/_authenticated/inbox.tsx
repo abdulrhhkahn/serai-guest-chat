@@ -116,18 +116,10 @@ function InboxPage() {
     },
   });
 
-  // Only auto-selects the first conversation once, on initial load —
-  // without this guard, closing a conversation (setActiveId to null)
-  // would immediately re-trigger this same effect and select right back
-  // into the first one, making a close button impossible.
-  const hasAutoSelectedRef = useRef(false);
-  useEffect(() => {
-    if (hasAutoSelectedRef.current) return;
-    if (!activeId && conversations?.length) {
-      setActiveId(conversations[0].id);
-      hasAutoSelectedRef.current = true;
-    }
-  }, [conversations, activeId]);
+  // Deliberately no auto-selecting a conversation on load — Inbox
+  // always starts on the "select a conversation" empty state, closing
+  // is what set that expectation, opening with something already
+  // selected would contradict it.
 
   const { data: messages } = useQuery({
     queryKey: ["messages", activeId],
