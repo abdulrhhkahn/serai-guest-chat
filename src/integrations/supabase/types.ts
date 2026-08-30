@@ -580,6 +580,8 @@ export type Database = {
           heard_about: string | null
           id: string
           last_name: string
+          meet_event_id: string | null
+          meet_join_url: string | null
           meeting_slot: string | null
           phone: string
           plan_tier: string
@@ -595,6 +597,8 @@ export type Database = {
           heard_about?: string | null
           id?: string
           last_name: string
+          meet_event_id?: string | null
+          meet_join_url?: string | null
           meeting_slot?: string | null
           phone: string
           plan_tier: string
@@ -610,6 +614,8 @@ export type Database = {
           heard_about?: string | null
           id?: string
           last_name?: string
+          meet_event_id?: string | null
+          meet_join_url?: string | null
           meeting_slot?: string | null
           phone?: string
           plan_tier?: string
