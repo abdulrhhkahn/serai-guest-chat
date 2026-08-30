@@ -32,7 +32,7 @@ const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/checkins", label: "Check-ins", icon: ClipboardList },
   { to: "/inbox", label: "Inbox", icon: Inbox },
-  { to: "/knowledge", label: "Knowledge base", icon: BookOpen },
+  { to: "/knowledge", label: "AI Concierge", icon: BookOpen },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;

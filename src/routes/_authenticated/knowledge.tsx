@@ -48,7 +48,7 @@ function KnowledgePage() {
     <div className="p-6 space-y-6 max-w-4xl">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-serif text-3xl">Knowledge base</h1>
+          <h1 className="font-serif text-3xl">AI Concierge</h1>
           <p className="text-sm text-muted-foreground">Powers the AI concierge that answers guest questions.</p>
         </div>
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
