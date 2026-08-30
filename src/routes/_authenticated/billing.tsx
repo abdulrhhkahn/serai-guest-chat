@@ -11,21 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { GuestTurnstile } from "@/components/GuestTurnstile";
 import { toast } from "sonner";
 import {
-  Radio,
-  Bot,
-  BarChart3,
-  LineChart,
-  Mail,
-  Building2,
-  QrCode,
   X,
-  Users,
-  UserCheck,
-  History,
-  Headphones,
+  Check,
   Calendar as CalendarIcon,
 } from "lucide-react";
-import { PLAN_FEATURES, PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
+import { PLAN_PRICING_PKR, type PlanTier } from "@/lib/billing";
 
 export const Route = createFileRoute("/_authenticated/billing")({
   component: BillingPage,
@@ -33,12 +23,6 @@ export const Route = createFileRoute("/_authenticated/billing")({
 
 const YEARLY_DISCOUNT_PERCENT = 10;
 const ONBOARDING_COST_PKR = 5000;
-
-const AUTONOMY_COPY: Record<string, string> = {
-  suggest: "AI suggests replies, staff sends every message",
-  approve_all: "AI drafts replies, staff approves before sending",
-  auto: "AI auto-sends on trusted topics, staff handles the rest",
-};
 
 const TIER_DESCRIPTION: Record<"basic" | PlanTier, string> = {
   basic: "Get started with in app web chat and essential guest messaging.",
@@ -175,36 +159,48 @@ function BillingPage() {
   );
 }
 
-const FEATURE_ICON = {
-  channels: Radio,
-  ai: Bot,
-  conversations: BarChart3,
-  analytics: LineChart,
-  digest: Mail,
-  multiProperty: Building2,
-  checkin: QrCode,
-  seats: Users,
-  verify: UserCheck,
-  activity: History,
-  chatSupport: Headphones,
-} as const;
+// Static per the pricing card mockup — no longer derived from
+// PLAN_FEATURES, since the requested wording ("Everything in Basic and…")
+// doesn't map cleanly onto individual feature flags anyway.
+const TIER_FEATURE_LIST: Record<"basic" | PlanTier, string[]> = {
+  basic: [
+    "QR code mobile check-in for guests",
+    "Dedicated hotel guest surface",
+    "Review and verify guests",
+    "AI Concierge - Suggests replies",
+    "Channel - In-app web chat",
+    "Conversations - 50/month",
+    "Email seats - 2",
+    "Single property",
+    "24/7 chat support",
+  ],
+  growth: [
+    "Everything in Basic and",
+    "AI Concierge - Drafts replies",
+    "Channel - WhatsApp & SMS",
+    "Conversations - Unlimited",
+    "Advanced analytics",
+    "Weekly analytics report",
+    "In-app staff activity tracker",
+    "Email seats - 5",
+  ],
+  pro: [
+    "Everything in Basic, Growth and",
+    "AI Concierge - Auto sends replies",
+    "Email seats - Unlimited",
+    "Multi-properties",
+    "Cross property comparison",
+  ],
+};
 
-function FeatureRow({ icon, label, value }: { icon: keyof typeof FEATURE_ICON; label: string; value?: string }) {
-  const IconComp = FEATURE_ICON[icon];
+function TickRow({ text, bold }: { text: string; bold?: boolean }) {
   return (
     <li className="flex items-start gap-2.5">
       <span className="h-6 w-6 shrink-0 flex items-center justify-center">
-        <IconComp className="h-5 w-5 text-brand" strokeWidth={2} />
+        <Check className="h-5 w-5 text-brand" strokeWidth={2.5} />
       </span>
-      <span className="text-sm text-muted-foreground leading-6">
-        {value ? (
-          <>
-            <span className="font-medium text-foreground">{label} — </span>
-            {value}
-          </>
-        ) : (
-          <span className="font-medium text-foreground">{label}</span>
-        )}
+      <span className={`text-sm leading-6 ${bold ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
+        {text}
       </span>
     </li>
   );
@@ -477,7 +473,6 @@ function PlanCard({
   redirecting?: boolean;
   restrictedNote?: string;
 }) {
-  const features = PLAN_FEATURES[tier];
   const pricing = tier === "basic" ? null : PLAN_PRICING_PKR[tier];
   const label = pricing?.label ?? "Basic";
   const isPopular = tier === "growth";
@@ -514,33 +509,9 @@ function PlanCard({
 
       <CardContent className="flex flex-col flex-1 pt-4">
         <ul className="space-y-3 flex-1">
-          <FeatureRow icon="checkin" label="Mobile check-in" value="QR code check-in for guests" />
-          <FeatureRow icon="verify" label="Review and verify guests" />
-          <FeatureRow icon="ai" label="AI chat behaviour" value={AUTONOMY_COPY[features.aiAutonomy]} />
-          <FeatureRow
-            icon="channels"
-            label="Channels"
-            value={features.channels.map((c) => (c === "web" ? "In app web chat" : c === "sms" ? "SMS" : "WhatsApp")).join(", ")}
-          />
-          <FeatureRow
-            icon="conversations"
-            label="Conversations"
-            value={features.maxConversationsPerMonth ? `${features.maxConversationsPerMonth}/month` : "Unlimited"}
-          />
-          <FeatureRow icon="activity" label="Staff activity" value={features.staffActivityLog ? "Included" : "Not included"} />
-          <FeatureRow
-            icon="seats"
-            label="Email seats"
-            value={features.maxStaff ? String(features.maxStaff) : "Unlimited"}
-          />
-          <FeatureRow icon="analytics" label="Analytics" value={features.analytics ? "Reply mix, containment, wait times, CSAT" : "Not included"} />
-          <FeatureRow icon="digest" label="Weekly analytics report" value={features.weeklyDigest ? "Included" : "Not included"} />
-          <FeatureRow
-            icon="multiProperty"
-            label="Property"
-            value={features.orgRollup ? "Add properties, cross-property comparison" : "Single property"}
-          />
-          <FeatureRow icon="chatSupport" label="24/7 chat support" value="Included" />
+          {TIER_FEATURE_LIST[tier].map((text, i) => (
+            <TickRow key={i} text={text} bold={i === 0 && tier !== "basic"} />
+          ))}
         </ul>
 
         <div className="mt-6 space-y-2">
