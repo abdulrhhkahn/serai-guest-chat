@@ -197,7 +197,7 @@ function TickRow({ text, bold }: { text: string; bold?: boolean }) {
   return (
     <li className="flex items-start gap-2.5">
       <span className="h-6 w-6 shrink-0 flex items-center justify-center">
-        <Check className="h-5 w-5 text-brand" strokeWidth={2.5} />
+        {!bold && <Check className="h-5 w-5 text-brand" strokeWidth={2.5} />}
       </span>
       <span className={`text-sm leading-6 ${bold ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
         {text}
