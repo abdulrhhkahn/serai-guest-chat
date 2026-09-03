@@ -185,7 +185,7 @@ const TIER_FEATURE_LIST: Record<"basic" | PlanTier, string[]> = {
     "Email seats - 5",
   ],
   pro: [
-    "Everything in Basic, Growth and",
+    "Everything in Growth and",
     "AI Concierge - Auto sends replies",
     "Email seats - Unlimited",
     "Multi-properties",
@@ -194,12 +194,15 @@ const TIER_FEATURE_LIST: Record<"basic" | PlanTier, string[]> = {
 };
 
 function TickRow({ text, bold }: { text: string; bold?: boolean }) {
+  if (bold) {
+    return <li className="text-sm font-semibold text-foreground leading-6">{text}</li>;
+  }
   return (
     <li className="flex items-start gap-2.5">
-      <span className="h-6 w-6 shrink-0 flex items-center justify-center">
-        {!bold && <Check className="h-5 w-5 text-brand" strokeWidth={2.5} />}
+      <span className="h-5 w-5 shrink-0 flex items-center justify-center">
+        <Check className="h-4 w-4 text-brand" strokeWidth={2.5} />
       </span>
-      <span className={`text-sm leading-6 ${bold ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
+      <span className="text-sm leading-6 text-muted-foreground">
         {text}
       </span>
     </li>
