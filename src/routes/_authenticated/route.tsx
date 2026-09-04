@@ -115,7 +115,7 @@ function AuthedLayout() {
         supabase.rpc("property_has_plan_at_least", { _property_id: property!.id, min_tier: "growth" }),
         supabase.rpc("property_has_plan_at_least", { _property_id: property!.id, min_tier: "pro" }),
       ]);
-      return proOk ? "Pro Plan" : growthOk ? "Growth Plan" : "Basic Plan";
+      return proOk ? "Pro Plan" : growthOk ? "Growth Plan" : "Essential Plan";
     },
   });
 

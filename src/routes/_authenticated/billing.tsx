@@ -111,7 +111,7 @@ function BillingPage() {
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <div className="flex flex-col items-center text-center gap-3">
         <p className="text-sm text-muted-foreground">
-          {isActive ? `Current plan: ${PLAN_PRICING_PKR[currentTier as PlanTier]?.label ?? "Basic"}` : "You're on the free Basic plan."}
+          {isActive ? `Current plan: ${PLAN_PRICING_PKR[currentTier as PlanTier]?.label ?? "Essential"}` : "You're on the free Essential plan."}
           {!noOrg && !canManageBilling && " Only your hotel's admin can change plans."}
         </p>
 
@@ -160,7 +160,7 @@ function BillingPage() {
 }
 
 // Static per the pricing card mockup — no longer derived from
-// PLAN_FEATURES, since the requested wording ("Everything in Basic and…")
+// PLAN_FEATURES, since the requested wording ("Everything in Essential and…")
 // doesn't map cleanly onto individual feature flags anyway.
 const TIER_FEATURE_LIST: Record<"basic" | PlanTier, string[]> = {
   basic: [
@@ -178,7 +178,7 @@ const TIER_FEATURE_LIST: Record<"basic" | PlanTier, string[]> = {
     "24/7 chat support",
   ],
   growth: [
-    "Everything in Basic and",
+    "Everything in Essential and",
     "AI Concierge - Drafts replies",
     "Channel - WhatsApp & SMS",
     "Conversations - Unlimited",
@@ -480,7 +480,7 @@ function PlanCard({
   restrictedNote?: string;
 }) {
   const pricing = tier === "basic" ? null : PLAN_PRICING_PKR[tier];
-  const label = pricing?.label ?? "Basic";
+  const label = pricing?.label ?? "Essential";
   const isPopular = tier === "growth";
   const displayedMonthly = pricing ? (billingCycle === "yearly" ? Math.round(pricing.monthlyPkr * (1 - YEARLY_DISCOUNT_PERCENT / 100)) : pricing.monthlyPkr) : null;
 
