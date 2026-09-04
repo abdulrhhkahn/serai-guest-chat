@@ -1,4 +1,4 @@
-export type PlanTier = "growth" | "pro"; // Basic stays free/unbilled
+export type PlanTier = "growth" | "pro"; // Essential (internal id: "basic") stays free/unbilled
 
 // Create these in the Safepay dashboard (Developer > Plans) first, then
 // paste the real plan_xxx IDs here.
