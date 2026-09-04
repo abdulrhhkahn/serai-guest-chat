@@ -208,17 +208,17 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
 
   // Also the reactivation path for an offboarded hotel — inserting a
   // fresh 'active' row here is what moves it back to Live Customers.
-  // If Basic is selected, this restores the true "no subscription"
+  // If Essential is selected, this restores the true "no subscription"
   // state instead — bringing a Live-but-free hotel back, or un-offboarding
   // one that was deactivated. This is deliberately NOT the same action as
-  // Deactivate: choosing Basic here means "stay/become a live customer on
+  // Deactivate: choosing Essential here means "stay/become a live customer on
   // the free tier," not "offboard them."
   async function activate(days: 30 | 365) {
     setActivating(true);
     try {
       if (tier === "basic") {
         await callAdmin({ action: "clearSubscription", orgId });
-        toast.success("Live on Basic");
+        toast.success("Live on Essential");
       } else {
         const res = await callAdmin({ action: "activateSubscription", orgId, planTier: tier, propertyCount, periodDays: days });
         toast.success(`Activated — PKR ${res.amountPkr?.toLocaleString()}/mo`);
@@ -248,13 +248,13 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
     }
   }
 
-  // Same Basic-vs-paid distinction as activate() above.
+  // Same Essential-vs-paid distinction as activate() above.
   async function save() {
     setSaving(true);
     try {
       if (tier === "basic") {
         await callAdmin({ action: "clearSubscription", orgId });
-        toast.success("Live on Basic");
+        toast.success("Live on Essential");
       } else {
         const res = await callAdmin({ action: "updateSubscription", orgId, planTier: tier, propertyCount });
         toast.success(`Saved — PKR ${res.amountPkr?.toLocaleString()}/mo`);
@@ -282,7 +282,7 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
             <DialogHeader>
               <DialogTitle className="font-serif text-2xl">{data.org.name}</DialogTitle>
               <p className="text-sm text-muted-foreground">
-                {sub ? `${sub.plan_tier} plan (${sub.status})` : "No subscription — Basic"}
+                {sub ? `${sub.plan_tier} plan (${sub.status})` : "No subscription — Essential"}
                 {sub?.status === "active" && sub.current_period_end && ` · renews ${new Date(sub.current_period_end).toLocaleDateString()}`}
               </p>
             </DialogHeader>
@@ -347,7 +347,7 @@ function HotelDetailDialog({ orgId, onClose }: { orgId: string; onClose: () => v
                       <Select value={tier} onValueChange={(v) => setTier(v as "basic" | PlanTier)}>
                         <SelectTrigger className="w-32 mt-1"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="basic">Basic</SelectItem>
+                          <SelectItem value="basic">Essential</SelectItem>
                           <SelectItem value="growth">Growth</SelectItem>
                           <SelectItem value="pro">Pro</SelectItem>
                         </SelectContent>
