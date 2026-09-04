@@ -159,7 +159,7 @@ function NewHotelCard({ onDone }: { onDone: () => void }) {
             <Select value={planTier} onValueChange={(v) => setPlanTier(v as "basic" | PlanTier)}>
               <SelectTrigger className="mt-1 w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="basic">Basic (free)</SelectItem>
+                <SelectItem value="basic">Essential (free)</SelectItem>
                 <SelectItem value="growth">Growth</SelectItem>
                 <SelectItem value="pro">Pro</SelectItem>
               </SelectContent>
