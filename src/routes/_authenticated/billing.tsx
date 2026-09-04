@@ -493,7 +493,7 @@ function PlanCard({
           </span>
         </div>
       )}
-      <CardHeader className="space-y-1">
+      <CardHeader className="p-5 space-y-1">
         <div>
           <p className="text-3xl font-bold">
             {displayedMonthly !== null ? `PKR ${displayedMonthly.toLocaleString()}` : "Free"}
@@ -513,14 +513,14 @@ function PlanCard({
 
       <div className="border-t border-border" />
 
-      <CardContent className="flex flex-col flex-1 pt-4">
-        <ul className="space-y-3 flex-1">
+      <CardContent className="flex flex-col flex-1 p-5 pt-3">
+        <ul className="space-y-1.5 flex-1">
           {TIER_FEATURE_LIST[tier].map((text, i) => (
             <TickRow key={i} text={text} bold={i === 0 && tier !== "basic"} />
           ))}
         </ul>
 
-        <div className="mt-6 space-y-2">
+        <div className="mt-4 space-y-2">
           {onBuyNow && !isCurrent ? (
             <Button className="w-full" onClick={onBuyNow} disabled={redirecting}>
               {redirecting ? "Redirecting…" : "Buy Now"}
