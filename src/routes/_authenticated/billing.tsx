@@ -165,6 +165,8 @@ function BillingPage() {
 const TIER_FEATURE_LIST: Record<"basic" | PlanTier, string[]> = {
   basic: [
     "QR code mobile check-in for guests",
+    "QR code enabled hotel menu for guests",
+    "QR code enabled local tour/activities for guests",
     "Dedicated hotel guest surface",
     "Review and verify guests",
     "AI Concierge - Suggests replies",
@@ -172,6 +174,7 @@ const TIER_FEATURE_LIST: Record<"basic" | PlanTier, string[]> = {
     "Conversations - 50/month",
     "Email seats - 2",
     "Single property",
+    "Offline capabilities and lightweight data load",
     "24/7 chat support",
   ],
   growth: [
