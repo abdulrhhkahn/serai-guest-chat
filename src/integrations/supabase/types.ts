@@ -432,6 +432,56 @@ export type Database = {
           },
         ]
       }
+      local_activities: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          image_url: string | null
+          name: string
+          price_text: string | null
+          property_id: string
+          provider_contact: string | null
+          provider_name: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          name: string
+          price_text?: string | null
+          property_id: string
+          provider_contact?: string | null
+          provider_name?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          name?: string
+          price_text?: string | null
+          property_id?: string
+          provider_contact?: string | null
+          provider_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "local_activities_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_items: {
         Row: {
           category: string
