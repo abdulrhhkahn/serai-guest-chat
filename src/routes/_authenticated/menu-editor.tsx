@@ -80,15 +80,12 @@ function MenuEditorPage() {
     );
   }
 
-  const menuUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/menu/${property.slug}`;
-
   return (
     <div className="p-6 max-w-3xl space-y-6">
       <div>
         <h1 className="font-serif text-3xl">Menu</h1>
         <p className="text-sm text-muted-foreground">
-          Manage what guests see at{" "}
-          <a href={menuUrl} target="_blank" rel="noreferrer" className="underline">{menuUrl}</a>
+          Manage what guests see after scanning the menu QR code.
         </p>
       </div>
 
