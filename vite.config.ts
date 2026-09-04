@@ -96,6 +96,25 @@ export default defineConfig(async ({ command, mode }) => {
             handler: "StaleWhileRevalidate",
             options: { cacheName: "serai-fonts" },
           },
+          {
+            // Only Supabase's REST reads (menus, activities, property
+            // info, etc.) — never PostgREST mutations, and never the
+            // realtime websocket, both excluded by the GET-only and
+            // path checks below. Menu/activity pages are read-mostly
+            // and rarely change, so a guest who already opened one once
+            // sees it instantly even fully offline, refreshing quietly
+            // whenever a connection actually exists.
+            urlPattern: ({ url, request }) =>
+              request.method === "GET" &&
+              /\.supabase\.co$/.test(url.hostname) &&
+              url.pathname.startsWith("/rest/v1/"),
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "serai-data",
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
       },
     }),
