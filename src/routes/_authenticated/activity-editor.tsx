@@ -155,15 +155,12 @@ function ActivityEditorPage() {
     );
   }
 
-  const activitiesUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/activities/${property.slug}`;
-
   return (
     <div className="p-6 max-w-3xl space-y-6">
       <div>
         <h1 className="font-serif text-3xl">Local activities</h1>
         <p className="text-sm text-muted-foreground">
-          Manage what guests see at{" "}
-          <a href={activitiesUrl} target="_blank" rel="noreferrer" className="underline">{activitiesUrl}</a>
+          Manage what guests see after scanning the local activities QR code.
         </p>
       </div>
 
