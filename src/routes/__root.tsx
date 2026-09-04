@@ -1,4 +1,6 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import {
   Outlet,
   Link,
@@ -144,10 +146,39 @@ function RootComponent() {
     void import("../lib/pwa-register").then((m) => m.registerServiceWorker());
   }, []);
 
+  // Persisting the query cache means a reload (or opening a previously
+  // visited page while offline) renders instantly from what was last
+  // fetched, instead of a blank loading state. This does NOT make data
+  // go stale on purpose: every query still refetches on mount as normal
+  // (default staleTime is 0) — persistence only supplies an instant
+  // placeholder for that brief moment before the real fetch resolves,
+  // and anything with a live realtime subscription (Inbox, chat) is
+  // corrected the moment that subscription reconnects regardless.
+  //
+  // window.localStorage doesn't exist during server rendering, so a
+  // no-op storage stands in there — persistence simply does nothing
+  // server-side, which is fine, since only a real browser session ever
+  // needs an instant-render placeholder.
+  const noopStorage: Storage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+    key: () => null,
+    length: 0,
+  };
+  const persister = createSyncStoragePersister({
+    storage: typeof window !== "undefined" ? window.localStorage : noopStorage,
+    key: "serai-query-cache",
+  });
+
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24 }}
+    >
       <Outlet />
       <Toaster richColors position="top-center" />
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }
