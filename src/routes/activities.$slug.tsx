@@ -120,7 +120,7 @@ function ActivitiesPage() {
                     <div key={item.id} className="bg-white rounded-lg border border-border p-3">
                       <div className="flex items-start gap-3">
                         {item.image_url && (
-                          <img src={item.image_url} alt={item.name} className="h-16 w-16 rounded-md object-cover shrink-0" />
+                          <img src={item.image_url} alt={item.name} loading="lazy" className="h-16 w-16 rounded-md object-cover shrink-0" />
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-3">
