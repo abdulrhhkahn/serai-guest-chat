@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Trash2, Plus, ArrowUp, ArrowDown, ImagePlus, X } from "lucide-react";
+import { compressImage } from "@/lib/compress-image";
 
 export const Route = createFileRoute("/_authenticated/menu-editor")({
   component: MenuEditorPage,
@@ -217,9 +218,10 @@ function MenuContent({ menuId, propertyId }: { menuId: string; propertyId: strin
 
   async function uploadImage(item: MenuItem, file: File) {
     setUploadingId(item.id);
-    const ext = file.name.split(".").pop() ?? "jpg";
+    const compressed = await compressImage(file);
+    const ext = compressed.name.split(".").pop() ?? "jpg";
     const path = `${propertyId}/${item.id}-${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage.from("menu-images").upload(path, file, { upsert: true });
+    const { error: uploadError } = await supabase.storage.from("menu-images").upload(path, compressed, { upsert: true });
     if (uploadError) {
       setUploadingId(null);
       return toast.error(uploadError.message);
