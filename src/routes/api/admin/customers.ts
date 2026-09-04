@@ -194,9 +194,9 @@ export const Route = createFileRoute("/api/admin/customers")({
           }
 
           // Cancels the org's current subscription — reverts them to
-          // Basic everywhere else in the app (plan-gating checks status
+          // Essential everywhere else in the app (plan-gating checks status
           // in ('active','past_due'), so 'canceled' falls through to the
-          // Basic default automatically). Keeps the row for history
+          // Essential default automatically). Keeps the row for history
           // rather than deleting it.
           case "deactivateSubscription": {
             const orgId = String(body.orgId ?? "");
@@ -210,7 +210,7 @@ export const Route = createFileRoute("/api/admin/customers")({
               return error ? bad(error.message, 500) : ok();
             }
 
-            // A hotel that's always been on Basic has no subscription row
+            // A hotel that's always been on Essential has no subscription row
             // at all to cancel — insert a placeholder canceled one purely
             // as an "offboarded" marker. amount_pkr: 0 and plan_tier
             // 'basic' here don't affect plan-gating anywhere else in the
@@ -230,7 +230,7 @@ export const Route = createFileRoute("/api/admin/customers")({
             return error ? bad(error.message, 500) : ok();
           }
 
-          // Reactivating a hotel onto Basic specifically (as opposed to
+          // Reactivating a hotel onto Essential specifically (as opposed to
           // Deactivate, which explicitly offboards them) means restoring
           // the true "no subscription row" state — same as a hotel that's
           // always been free. Deleting the row(s) rather than updating
