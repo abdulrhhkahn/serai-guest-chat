@@ -84,6 +84,7 @@ function SettingsForm({ form, setForm, saving, setSaving, uploading, setUploadin
   const digestAllowed = !!plan?.growthOk;
 
   const guestUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/checkin/${form.slug}`;
+  const menuUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/menu/${form.slug}`;
 
   async function save() {
     if (!form) return;
@@ -202,6 +203,27 @@ function SettingsForm({ form, setForm, saving, setSaving, uploading, setUploadin
               </Button>
             </div>
             <a href={guestUrl} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline inline-block">Open guest surface →</a>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <h2 className="font-medium">Guest menu link</h2>
+        <p className="text-sm text-muted-foreground mb-4">Print or share this QR so guests can browse your menu — no check-in or login needed.</p>
+        <div className="flex flex-col sm:flex-row gap-6 items-start">
+          <div className="p-4 bg-white rounded-lg border border-border">
+            <QRCodeSVG value={menuUrl} size={180} />
+          </div>
+          <div className="flex-1 space-y-2 min-w-0">
+            <Label>URL</Label>
+            <div className="flex gap-2">
+              <Input readOnly value={menuUrl} />
+              <Button variant="outline" size="icon" title="Copy link" onClick={() => { navigator.clipboard.writeText(menuUrl); toast.success("Copied"); }}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <a href={menuUrl} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline inline-block">Preview menu →</a>
+            <a href="/menu-editor" className="text-sm text-primary hover:underline inline-block ml-4">Manage menu items →</a>
           </div>
         </div>
       </Card>
