@@ -66,11 +66,36 @@ function CheckinFlow() {
 
   const steps = ["Welcome", "Details", "ID", "Sign", "Done"];
 
+  async function verifyDocument(file: File): Promise<{ valid: boolean; reason?: string }> {
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(",")[1] ?? "");
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const res = await fetch("/api/checkin/verify-document", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageBase64: base64, mimeType: file.type }),
+    });
+    if (!res.ok) return { valid: true }; // fail open on a route-level error
+    return res.json();
+  }
+
   async function submit() {
     if (!form.terms) return toast.error("Please accept the terms");
     if (sigRef.current?.isEmpty()) return toast.error("Please sign");
     setSubmitting(true);
     try {
+      if (form.id_file) {
+        const check = await verifyDocument(form.id_file);
+        if (!check.valid) {
+          toast.error(check.reason ?? "Please upload a government ID, driver's license, or passport.");
+          setSubmitting(false);
+          return;
+        }
+      }
+
       // Anonymous guest session: required so storage uploads + the check-in
       // insert run as `authenticated` (matching the hardened RLS policies) and
       // so the check-in is tied to a throttleable identity.
