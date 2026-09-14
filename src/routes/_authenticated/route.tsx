@@ -275,7 +275,7 @@ function AuthedLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="h-screen flex w-full bg-background overflow-hidden">
         <Sidebar collapsible="icon">
           <SidebarHeader className="border-b border-sidebar-border h-16 justify-center">
             {isOrgAdmin && properties && properties.length > 0 ? (
@@ -402,7 +402,7 @@ function AuthedLayout() {
           </SidebarFooter>
         </Sidebar>
 
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <header className="h-16 flex items-center gap-2 border-b border-border px-3 bg-card/50">
             <SidebarTrigger title="Toggle sidebar" />
             <Separator orientation="vertical" className="h-4" />
@@ -424,7 +424,7 @@ function AuthedLayout() {
             )}
             <ThemeToggle />
           </header>
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto min-h-0">
             <Outlet />
           </main>
         </div>

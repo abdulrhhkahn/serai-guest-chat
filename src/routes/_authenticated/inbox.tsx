@@ -493,7 +493,7 @@ function InboxPage() {
   });
 
   return (
-    <div className="h-[calc(100vh-3rem)] grid grid-cols-1 md:grid-cols-[360px_1fr]">
+    <div className="h-full grid grid-cols-1 md:grid-cols-[360px_1fr]">
       <aside className="border-r border-border overflow-y-auto overflow-x-hidden bg-card/30">
         <div className="p-4 border-b border-border">
           <h2 className="font-serif text-xl">Inbox</h2>
