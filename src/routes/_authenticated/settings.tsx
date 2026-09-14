@@ -278,7 +278,7 @@ function levelAllowed(level: string, plan?: { growthOk: boolean; proOk: boolean 
   if (!plan) return true; // don't block the UI while loading
   if (level === "suggest") return true;
   if (level === "approve") return plan.growthOk;
-  if (level === "auto") return plan.proOk;
+  if (level === "auto") return plan.growthOk;
   return true;
 }
 

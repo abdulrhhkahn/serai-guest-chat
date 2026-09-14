@@ -179,7 +179,7 @@ const TIER_FEATURE_LIST: Record<"basic" | PlanTier, string[]> = {
   ],
   growth: [
     "Everything in Essential and",
-    "AI Concierge - Drafts replies",
+    "AI Concierge - Auto sends replies",
     "Channel - WhatsApp & SMS",
     "Conversations - Unlimited",
     "Advanced analytics",
@@ -189,7 +189,6 @@ const TIER_FEATURE_LIST: Record<"basic" | PlanTier, string[]> = {
   ],
   pro: [
     "Everything in Growth and",
-    "AI Concierge - Auto sends replies",
     "Email seats - Unlimited",
     "Multi-properties",
     "Cross property comparison",
