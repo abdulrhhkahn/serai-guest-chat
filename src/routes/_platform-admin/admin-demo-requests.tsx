@@ -23,6 +23,7 @@ type Lead = {
   plan_tier: string;
   heard_about: string | null;
   scheduled_at: string | null;
+  meet_join_url: string | null;
   created_at: string;
 };
 
@@ -34,7 +35,7 @@ function AdminDemoRequestsPage() {
     queryFn: async (): Promise<Lead[]> => {
       const { data, error } = await supabase
         .from("plan_interest_leads")
-        .select("id, first_name, last_name, work_email, phone, property_type, property_count, plan_tier, heard_about, scheduled_at, created_at")
+        .select("id, first_name, last_name, work_email, phone, property_type, property_count, plan_tier, heard_about, scheduled_at, created_at, meet_join_url")
         .order("scheduled_at", { ascending: true, nullsFirst: false })
         .limit(FETCH_LIMIT);
       if (error) throw error;
@@ -104,9 +105,18 @@ function AdminDemoRequestsPage() {
                     <td className="px-4 py-3 capitalize">{l.plan_tier}</td>
                     <td className="px-4 py-3">
                       {l.scheduled_at ? (
-                        <span className={`rounded-md px-2 py-0.5 text-xs ${upcoming ? "bg-brand/15 text-brand" : "bg-muted text-muted-foreground"}`}>
-                          {format(new Date(l.scheduled_at), "MMM d, h:mm a")}
-                        </span>
+                        <div className="space-y-1">
+                          <span className={`inline-block rounded-md px-2 py-0.5 text-xs ${upcoming ? "bg-brand/15 text-brand" : "bg-muted text-muted-foreground"}`}>
+                            {format(new Date(l.scheduled_at), "MMM d, h:mm a")}
+                          </span>
+                          {l.meet_join_url ? (
+                            <a href={l.meet_join_url} target="_blank" rel="noreferrer" className="block text-xs text-brand underline">
+                              Join Google Meet
+                            </a>
+                          ) : (
+                            <span className="block text-xs text-muted-foreground">No link yet</span>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
