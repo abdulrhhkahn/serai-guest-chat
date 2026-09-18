@@ -299,35 +299,42 @@ function BookDemoForm({ tier, onClose }: { tier: PlanTier; onClose: () => void }
     if (!isValid || !selectedSlot || submitting) return;
     setSubmitting(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const { error } = await supabase.from("plan_interest_leads").insert({
-        submitted_by: auth.user?.id,
-        plan_tier: tier,
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        work_email: workEmail.trim(),
-        property_type: propertyType,
-        property_count: propertyCountNum,
-        phone: phone.trim(),
-        heard_about: heardAbout || null,
-        scheduled_at: selectedSlot.date.toISOString(),
+      const { data: s } = await supabase.auth.getSession();
+      const res = await fetch("/api/billing/book-demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
+        body: JSON.stringify({
+          planTier: tier,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          workEmail: workEmail.trim(),
+          propertyType,
+          propertyCount: propertyCountNum,
+          phone: phone.trim(),
+          heardAbout: heardAbout || null,
+          scheduledAtIso: selectedSlot.date.toISOString(),
+        }),
       });
-      if (error) throw error;
-      toast.success(`Meeting scheduled for ${selectedSlot.date.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })} at ${selectedSlot.label}.`);
-      onClose();
-    } catch (e) {
-      // 23505 = unique_violation — someone else took this exact slot
-      // between it loading and this submit (the race the DB constraint
-      // exists to catch). Send them back to pick a different one instead
-      // of showing a raw constraint error.
-      if (e && typeof e === "object" && "code" in e && (e as { code: string }).code === "23505") {
+
+      if (res.status === 409) {
+        // Someone else took this exact slot between it loading and this
+        // submit (the race the DB's unique constraint exists to catch).
+        // Send them back to pick a different one instead of a raw error.
         toast.error("That slot was just taken — pick another.");
         setSelectedSlot(null);
         setStep(1);
         refetchAvailability();
-      } else {
-        toast.error(e instanceof Error ? e.message : "Couldn't schedule the meeting");
+        return;
       }
+      if (!res.ok) throw new Error(await res.text());
+
+      toast.success(
+        `Meeting scheduled for ${selectedSlot.date.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })} at ${selectedSlot.label} — check your email for confirmation.`,
+      );
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't schedule the meeting");
+    } finally {
       setSubmitting(false);
     }
   }
