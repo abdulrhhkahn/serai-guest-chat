@@ -128,6 +128,36 @@ export const Route = createFileRoute("/api/billing/book-demo")({
             text: `Hi ${firstName},\n\nYour demo is confirmed for ${when}.\n\n${meetLineText}\n\nLooking forward to it!\n\n— The Serai team`,
           });
           if (!result.ok) console.error("Demo confirmation email failed for lead", lead.id, result.error);
+
+          // Separate from the guest-facing confirmation above — sent to
+          // whoever should actually see new bookings land, not to the
+          // domain's own "demos@" sender address (that address only
+          // sends, it has no real inbox behind it). Skipped entirely if
+          // DEMO_NOTIFY_EMAIL isn't set, same fail-open spirit as the
+          // rest of this route — a missing notification shouldn't ever
+          // block a booking from succeeding.
+          const notifyEmail = process.env.DEMO_NOTIFY_EMAIL;
+          if (notifyEmail) {
+            const notifyResult = await sendEmail({
+              to: [notifyEmail],
+              subject: `New demo booked — ${firstName} ${lastName}`,
+              html: `
+                <p>New demo request.</p>
+                <ul>
+                  <li><strong>Name:</strong> ${firstName} ${lastName}</li>
+                  <li><strong>Email:</strong> ${workEmail}</li>
+                  <li><strong>Phone:</strong> ${phone}</li>
+                  <li><strong>Property type:</strong> ${propertyType} (${propertyCount})</li>
+                  <li><strong>Plan interested in:</strong> ${planTier}</li>
+                  <li><strong>Scheduled:</strong> ${when}</li>
+                  ${heardAbout ? `<li><strong>Heard about us via:</strong> ${heardAbout}</li>` : ""}
+                </ul>
+                ${meetLine}
+              `,
+              text: `New demo request.\n\nName: ${firstName} ${lastName}\nEmail: ${workEmail}\nPhone: ${phone}\nProperty type: ${propertyType} (${propertyCount})\nPlan interested in: ${planTier}\nScheduled: ${when}${heardAbout ? `\nHeard about us via: ${heardAbout}` : ""}\n\n${meetLineText}`,
+            });
+            if (!notifyResult.ok) console.error("Demo notify email failed for lead", lead.id, notifyResult.error);
+          }
         }
 
         return Response.json({ ok: true, meetJoinUrl });
