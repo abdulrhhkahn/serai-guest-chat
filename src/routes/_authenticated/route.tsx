@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect, useNavigate, Link, useRouterState } 
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarHeader, SidebarSeparator, useSidebar } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2, Table, History, MessageCircle } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2, Table, History, MessageCircle, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
@@ -286,10 +286,11 @@ function AuthedLayout() {
                       <button className="flex w-full items-center gap-2 px-2 py-2 hover:bg-sidebar-accent rounded-md transition text-left group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
                         <div className="h-7 w-7 rounded-md flex-shrink-0" style={{ background: property?.brand_color ?? "#0b6b75" }} />
                         <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                          <div className="truncate text-sm font-serif">
-                            {property?.name ?? "Serai"}{planLabel && <span className="text-muted-foreground font-sans text-xs"> | {planLabel}</span>}
+                          <div className="flex items-center gap-1 truncate text-sm font-serif">
+                            <span className="truncate">{property?.name ?? "Serai"}</span>
+                            <ChevronsUpDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                           </div>
-                          <div className="truncate text-[11px] text-muted-foreground">Switch property ▾</div>
+                          {planLabel && <div className="truncate text-[11px] text-muted-foreground">{planLabel}</div>}
                         </div>
                       </button>
                     </DropdownMenuTrigger>
