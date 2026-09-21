@@ -80,6 +80,12 @@ export const Route = createFileRoute("/api/billing/book-demo")({
         }
 
         let meetJoinUrl: string | null = null;
+        // Temporary diagnostics — surfaced directly in the response so a
+        // test booking shows exactly what happened, without needing to
+        // dig through Vercel's function logs (which have been genuinely
+        // hard to locate reliably). Safe to remove once this is confirmed
+        // working end-to-end; nothing here is sensitive.
+        const debug: string[] = [];
 
         if (googleMeetConfigured()) {
           try {
@@ -90,13 +96,17 @@ export const Route = createFileRoute("/api/billing/book-demo")({
               attendeeEmail: workEmail,
             });
             meetJoinUrl = meeting.joinUrl;
+            debug.push("meet: created ok");
             await supabaseAdmin
               .from("plan_interest_leads")
               .update({ meet_join_url: meeting.joinUrl, meet_event_id: meeting.eventId })
               .eq("id", lead.id);
           } catch (e) {
             console.error("Google Meet creation failed for lead", lead.id, e);
+            debug.push(`meet: FAILED — ${e instanceof Error ? e.message : String(e)}`);
           }
+        } else {
+          debug.push("meet: not configured (missing GOOGLE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN)");
         }
 
         if (emailConfigured()) {
@@ -127,7 +137,12 @@ export const Route = createFileRoute("/api/billing/book-demo")({
             `,
             text: `Hi ${firstName},\n\nYour demo is confirmed for ${when}.\n\n${meetLineText}\n\nLooking forward to it!\n\n— The Serai team`,
           });
-          if (!result.ok) console.error("Demo confirmation email failed for lead", lead.id, result.error);
+          if (!result.ok) {
+            console.error("Demo confirmation email failed for lead", lead.id, result.error);
+            debug.push(`guest email: FAILED — ${result.error}`);
+          } else {
+            debug.push(`guest email: sent to ${workEmail}`);
+          }
 
           // Separate from the guest-facing confirmation above — sent to
           // whoever should actually see new bookings land, not to the
@@ -156,11 +171,20 @@ export const Route = createFileRoute("/api/billing/book-demo")({
               `,
               text: `New demo request.\n\nName: ${firstName} ${lastName}\nEmail: ${workEmail}\nPhone: ${phone}\nProperty type: ${propertyType} (${propertyCount})\nPlan interested in: ${planTier}\nScheduled: ${when}${heardAbout ? `\nHeard about us via: ${heardAbout}` : ""}\n\n${meetLineText}`,
             });
-            if (!notifyResult.ok) console.error("Demo notify email failed for lead", lead.id, notifyResult.error);
+            if (!notifyResult.ok) {
+              console.error("Demo notify email failed for lead", lead.id, notifyResult.error);
+              debug.push(`notify email: FAILED — ${notifyResult.error}`);
+            } else {
+              debug.push(`notify email: sent to ${notifyEmail}`);
+            }
+          } else {
+            debug.push("notify email: DEMO_NOTIFY_EMAIL not set");
           }
+        } else {
+          debug.push("email: not configured (missing RESEND_API_KEY/REPORT_FROM_EMAIL)");
         }
 
-        return Response.json({ ok: true, meetJoinUrl });
+        return Response.json({ ok: true, meetJoinUrl, debug });
       },
     },
   },
