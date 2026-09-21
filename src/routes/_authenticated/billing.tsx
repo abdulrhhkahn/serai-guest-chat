@@ -326,7 +326,20 @@ function BookDemoForm({ tier, onClose }: { tier: PlanTier; onClose: () => void }
         refetchAvailability();
         return;
       }
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        // The server now always returns JSON, even on a crash (see
+        // book-demo.ts's top-level try/catch) — this reads the actual
+        // error message out of it instead of showing raw response text,
+        // which used to be a full HTML error page when something crashed.
+        let message = "Couldn't schedule the meeting";
+        try {
+          const errBody = await res.json();
+          if (errBody?.error) message = errBody.error;
+        } catch {
+          // Response wasn't JSON at all — fall back to the generic message.
+        }
+        throw new Error(message);
+      }
       const result = await res.json();
 
       // Temporary — prints exactly what succeeded/failed for Meet and
