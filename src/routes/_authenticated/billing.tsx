@@ -164,9 +164,9 @@ function BillingPage() {
 // doesn't map cleanly onto individual feature flags anyway.
 const TIER_FEATURE_LIST: Record<"basic" | PlanTier, string[]> = {
   basic: [
-    "QR code mobile check-in for guests",
-    "QR code enabled hotel menu for guests",
-    "QR code enabled local tour/activities for guests",
+    "Contactless digital check-in",
+    "Contactless digital F&B menu/room service",
+    "Contactless digital local tour/activities booking",
     "Dedicated hotel guest surface",
     "Review and verify guests",
     "AI Concierge - Suggests replies",
