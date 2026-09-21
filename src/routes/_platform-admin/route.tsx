@@ -89,6 +89,38 @@ function PlatformAdminLayout() {
     return () => { supabase.removeChannel(ch); };
   }, [refetchSupportCount]);
 
+  // Same pattern again for demo requests — viewed mirrors needs_admin's
+  // role exactly, just scoped to plan_interest_leads instead of support
+  // threads. The demo-requests page itself marks rows viewed on mount.
+  const { data: unviewedDemoCount, refetch: refetchDemoCount } = useQuery({
+    queryKey: ["demo-requests-unviewed-count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("plan_interest_leads")
+        .select("id", { count: "exact", head: true })
+        .eq("viewed", false);
+      return count ?? 0;
+    },
+  });
+
+  useEffect(() => {
+    const ch = supabase
+      .channel("platform-admin-demo-requests")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "plan_interest_leads" },
+        (payload) => {
+          const row = payload.new as { first_name?: string; last_name?: string };
+          const name = [row.first_name, row.last_name].filter(Boolean).join(" ");
+          toast.info("New demo request", { description: name || undefined });
+          playNotificationSound();
+          refetchDemoCount();
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [refetchDemoCount]);
+
   async function signOut() {
     sessionStorage.removeItem("admin_gate_token");
     await qc.cancelQueries();
@@ -119,6 +151,11 @@ function PlatformAdminLayout() {
                 {item.to === "/admin-support" && !!needsAdminCount && (
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-medium text-destructive-foreground">
                     {needsAdminCount > 99 ? "99+" : needsAdminCount}
+                  </span>
+                )}
+                {item.to === "/admin-demo-requests" && !!unviewedDemoCount && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-medium text-destructive-foreground">
+                    {unviewedDemoCount > 99 ? "99+" : unviewedDemoCount}
                   </span>
                 )}
               </Link>

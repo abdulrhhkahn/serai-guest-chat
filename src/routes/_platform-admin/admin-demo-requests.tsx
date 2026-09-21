@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { format, isFuture } from "date-fns";
@@ -29,6 +29,7 @@ type Lead = {
 
 function AdminDemoRequestsPage() {
   const [search, setSearch] = useState("");
+  const qc = useQueryClient();
 
   const { data: leads, isLoading, isError, error } = useQuery({
     queryKey: ["demo-requests"],
@@ -42,6 +43,19 @@ function AdminDemoRequestsPage() {
       return data ?? [];
     },
   });
+
+  // Opening this page counts as read for whatever's currently unviewed —
+  // same "viewing clears the badge" pattern as Support and the staff
+  // Inbox, just applied to a flat list instead of individual threads.
+  useEffect(() => {
+    supabase
+      .from("plan_interest_leads")
+      .update({ viewed: true })
+      .eq("viewed", false)
+      .then(() => {
+        qc.invalidateQueries({ queryKey: ["demo-requests-unviewed-count"] });
+      });
+  }, [qc]);
 
   const filtered = useMemo(() => {
     const list = leads ?? [];
