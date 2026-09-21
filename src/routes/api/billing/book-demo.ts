@@ -19,6 +19,7 @@ export const Route = createFileRoute("/api/billing/book-demo")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        try {
         const authHeader = request.headers.get("Authorization");
         if (!authHeader) return new Response("Unauthorized", { status: 401 });
 
@@ -185,6 +186,21 @@ export const Route = createFileRoute("/api/billing/book-demo")({
         }
 
         return Response.json({ ok: true, meetJoinUrl, debug });
+        } catch (e) {
+          // Any unhandled crash lands here instead of falling through to
+          // a generic HTML error page — returns the actual error message
+          // and stack as plain JSON, so it shows up readably in the
+          // browser instead of a wall of raw markup.
+          console.error("book-demo crashed", e);
+          return Response.json(
+            {
+              ok: false,
+              error: e instanceof Error ? e.message : String(e),
+              stack: e instanceof Error ? e.stack : undefined,
+            },
+            { status: 500 },
+          );
+        }
       },
     },
   },
