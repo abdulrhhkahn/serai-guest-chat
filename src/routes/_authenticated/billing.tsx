@@ -327,6 +327,12 @@ function BookDemoForm({ tier, onClose }: { tier: PlanTier; onClose: () => void }
         return;
       }
       if (!res.ok) throw new Error(await res.text());
+      const result = await res.json();
+
+      // Temporary — prints exactly what succeeded/failed for Meet and
+      // both emails, straight to the browser console. Open DevTools
+      // (F12) → Console tab after a test booking to see it.
+      console.log("Demo booking debug:", result.debug);
 
       toast.success(
         `Meeting scheduled for ${selectedSlot.date.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })} at ${selectedSlot.label} — check your email for confirmation.`,
