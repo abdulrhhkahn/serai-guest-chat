@@ -725,6 +725,7 @@ export type Database = {
           property_type: string
           scheduled_at: string | null
           submitted_by: string | null
+          viewed: boolean
           work_email: string
         }
         Insert: {
@@ -742,6 +743,7 @@ export type Database = {
           property_type: string
           scheduled_at?: string | null
           submitted_by?: string | null
+          viewed?: boolean
           work_email: string
         }
         Update: {
@@ -759,6 +761,7 @@ export type Database = {
           property_type?: string
           scheduled_at?: string | null
           submitted_by?: string | null
+          viewed?: boolean
           work_email?: string
         }
         Relationships: []
