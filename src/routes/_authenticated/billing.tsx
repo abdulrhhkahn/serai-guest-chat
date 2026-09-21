@@ -255,9 +255,14 @@ function BookDemoForm({ tier, onClose }: { tier: PlanTier; onClose: () => void }
   // narrow server route that returns only timestamps, never the other
   // leads' names/emails, since plan_interest_leads itself is admin-only
   // to read directly.
-  const { data: takenSlots, refetch: refetchAvailability } = useQuery({
+  // Query cache data (including this) gets persisted to localStorage for
+  // offline/fast-reload support — a Set doesn't survive that JSON
+  // round-trip (JSON.stringify(new Set([1])) is just "{}"), so this
+  // returns a plain array instead and only becomes a Set at the point
+  // of use below, never inside anything that gets cached.
+  const { data: takenSlotsArray, refetch: refetchAvailability } = useQuery({
     queryKey: ["demo-availability"],
-    queryFn: async (): Promise<Set<number>> => {
+    queryFn: async (): Promise<number[]> => {
       const { data: s } = await supabase.auth.getSession();
       const from = availableDays[0];
       const to = new Date(availableDays[availableDays.length - 1]);
@@ -267,11 +272,12 @@ function BookDemoForm({ tier, onClose }: { tier: PlanTier; onClose: () => void }
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
         body: JSON.stringify({ from: from.toISOString(), to: to.toISOString() }),
       });
-      if (!res.ok) return new Set();
+      if (!res.ok) return [];
       const body = await res.json();
-      return new Set((body.taken as string[]).map((t) => new Date(t).getTime()));
+      return (body.taken as string[]).map((t) => new Date(t).getTime());
     },
   });
+  const takenSlots = new Set(takenSlotsArray ?? []);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -399,7 +405,7 @@ function BookDemoForm({ tier, onClose }: { tier: PlanTier; onClose: () => void }
             </div>
             <div className="grid grid-cols-4 gap-2">
               {daySlots.map((slot) => {
-                const isTaken = takenSlots?.has(slot.date.getTime()) ?? false;
+                const isTaken = takenSlots.has(slot.date.getTime());
                 return (
                   <button
                     key={slot.date.toISOString()}
