@@ -548,14 +548,14 @@ function InboxPage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="h-8 min-w-0 flex-1 text-xs px-1.5"
+                className="h-8 min-w-0 flex-1 text-xs px-1.5 dark:[color-scheme:dark]"
               />
               <span className="text-xs text-muted-foreground shrink-0">→</span>
               <Input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="h-8 min-w-0 flex-1 text-xs px-1.5"
+                className="h-8 min-w-0 flex-1 text-xs px-1.5 dark:[color-scheme:dark]"
               />
             </div>
             {filtersActive && (

@@ -538,11 +538,11 @@ function AnalyticsPage() {
           </div>
           <div>
             <Label htmlFor="from" className="text-xs">From</Label>
-            <Input id="from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9" />
+            <Input id="from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 dark:[color-scheme:dark]" />
           </div>
           <div>
             <Label htmlFor="to" className="text-xs">To</Label>
-            <Input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9" />
+            <Input id="to" type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 dark:[color-scheme:dark]" />
           </div>
           <div className="flex gap-1">
             <button onClick={() => preset(7)} className="text-xs px-2 py-1 rounded border border-border hover:bg-accent">7d</button>
