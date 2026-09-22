@@ -27,7 +27,7 @@ export const Route = createFileRoute("/api/staff/properties-overview")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const { data: roles } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userData.user.id);
-        if (!(roles ?? []).some((r) => r.role === "admin")) return Response.json({ error: "Forbidden — this account doesn't have the admin role." }, { status: 403 });
+        if (!(roles ?? []).some((r) => r.role === "admin")) return Response.json({ error: `Forbidden — user_id ${userData.user.id} has roles: ${JSON.stringify(roles)}` }, { status: 403 });
 
         const { data: properties, error: propErr } = await supabaseAdmin
           .from("properties")
