@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sparkles, Send, FileText, Users, History, AlertTriangle, Clock, CheckCircle2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
@@ -533,16 +534,17 @@ function InboxPage() {
                 className="h-8 pl-8 text-xs"
               />
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-              className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-            >
-              <option value="any">Any status</option>
-              <option value="needs_staff">Needs attention</option>
-              <option value="open">Unresolved</option>
-              <option value="resolved">Resolved</option>
-            </select>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any status</SelectItem>
+                <SelectItem value="needs_staff">Needs attention</SelectItem>
+                <SelectItem value="open">Unresolved</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+              </SelectContent>
+            </Select>
             <div className="flex items-center gap-1.5">
               <Input
                 type="date"

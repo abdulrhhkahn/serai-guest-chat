@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Download } from "lucide-react";import { useMemo, useState } from "react";
 import { format, subDays, parseISO, eachDayOfInterval } from "date-fns";
 import { containmentByTopic, overallContainment, channelVolume, containmentByDay } from "@/lib/analytics";
 import { formatChange, graduationDateSet, type AuditEntry } from "@/lib/autonomy-audit";
@@ -524,17 +524,17 @@ function AnalyticsPage() {
         <div className="ml-auto flex flex-wrap items-end gap-2">
           <div>
             <Label htmlFor="property" className="text-xs">Property</Label>
-            <select
-              id="property"
-              value={propertyId}
-              onChange={(e) => setPropertyId(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-2 text-sm block"
-            >
-              <option value="all">All properties</option>
-              {propertyOptions.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+            <Select value={propertyId} onValueChange={setPropertyId}>
+              <SelectTrigger id="property" className="h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All properties</SelectItem>
+                {propertyOptions.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label htmlFor="from" className="text-xs">From</Label>

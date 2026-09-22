@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -331,23 +332,27 @@ function AutonomyCard({ propertyId }: { propertyId: string }) {
       </div>
       <div>
         <Label>Default</Label>
-        <select
+        <Select
           value={def}
-          onChange={(e) => {
-            if (!levelAllowed(e.target.value, plan)) {
+          onValueChange={(v) => {
+            if (!levelAllowed(v, plan)) {
               navigate({ to: "/billing" });
               return;
             }
-            setDef(e.target.value);
+            setDef(v);
           }}
-          className="mt-1 h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
         >
-          {LEVELS.map(([v, l]) => (
-            <option key={v} value={v}>
-              {l}{!levelAllowed(v, plan) ? " (upgrade required)" : ""}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="mt-1 w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LEVELS.map(([v, l]) => (
+              <SelectItem key={v} value={v}>
+                {l}{!levelAllowed(v, plan) ? " (upgrade required)" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       {(data?.cats.length ?? 0) > 0 && (
         <div className="space-y-2">
@@ -355,23 +360,27 @@ function AutonomyCard({ propertyId }: { propertyId: string }) {
           {data!.cats.map((cat) => (
             <div key={cat} className="flex items-center gap-3">
               <span className="text-sm flex-1 truncate">{cat}</span>
-              <select
+              <Select
                 value={rules[cat] ?? def}
-                onChange={(e) => {
-                  if (!levelAllowed(e.target.value, plan)) {
+                onValueChange={(v) => {
+                  if (!levelAllowed(v, plan)) {
                     navigate({ to: "/billing" });
                     return;
                   }
-                  setRules((prev) => ({ ...prev, [cat]: e.target.value }));
+                  setRules((prev) => ({ ...prev, [cat]: v }));
                 }}
-                className="h-9 w-40 rounded-md border border-border bg-background px-2 text-sm"
               >
-                {LEVELS.map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}{!levelAllowed(v, plan) ? " (upgrade)" : ""}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEVELS.map(([v, l]) => (
+                    <SelectItem key={v} value={v}>
+                      {l}{!levelAllowed(v, plan) ? " (upgrade)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           ))}
         </div>
@@ -456,10 +465,15 @@ function MessagingNumbersCard({ propertyId }: { propertyId: string }) {
       <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
         <div>
           <Label>Channel</Label>
-          <select value={channel} onChange={(e) => setChannel(e.target.value)} className="mt-2 h-10 w-full sm:w-32 rounded-md border border-border bg-background px-3 text-sm">
-            <option value="sms">SMS</option>
-            <option value="whatsapp">WhatsApp</option>
-          </select>
+          <Select value={channel} onValueChange={setChannel}>
+            <SelectTrigger className="mt-2 w-full sm:w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sms">SMS</SelectItem>
+              <SelectItem value="whatsapp">WhatsApp</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex-1">
           <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+14155551234" />
