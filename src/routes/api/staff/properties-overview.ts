@@ -15,25 +15,25 @@ export const Route = createFileRoute("/api/staff/properties-overview")({
       POST: async ({ request }) => {
         try {
         const authHeader = request.headers.get("Authorization");
-        if (!authHeader) return new Response("Unauthorized", { status: 401 });
+        if (!authHeader) return Response.json({ error: "Unauthorized — no session found. Try signing out and back in." }, { status: 401 });
 
         const asUser = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
           global: { headers: { Authorization: authHeader } },
           auth: { persistSession: false, autoRefreshToken: false },
         });
         const { data: userData, error: userErr } = await asUser.auth.getUser();
-        if (userErr || !userData.user) return new Response("Unauthorized", { status: 401 });
+        if (userErr || !userData.user) return Response.json({ error: `Unauthorized — ${userErr?.message ?? "no user found for this session"}` }, { status: 401 });
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const { data: roles } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userData.user.id);
-        if (!(roles ?? []).some((r) => r.role === "admin")) return new Response("Forbidden", { status: 403 });
+        if (!(roles ?? []).some((r) => r.role === "admin")) return Response.json({ error: "Forbidden — this account doesn't have the admin role." }, { status: 403 });
 
         const { data: properties, error: propErr } = await supabaseAdmin
           .from("properties")
           .select("id, name, slug, organization_id")
           .order("name");
-        if (propErr) return new Response(propErr.message, { status: 500 });
+        if (propErr) return Response.json({ error: propErr.message }, { status: 500 });
 
         const orgIds = [...new Set((properties ?? []).map((p) => p.organization_id).filter((id): id is string => !!id))];
         const { data: orgs } = orgIds.length
