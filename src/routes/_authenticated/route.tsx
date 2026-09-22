@@ -222,7 +222,7 @@ function AuthedLayout() {
     queryKey: ["all-properties", isAdmin, myOrgId],
     enabled: !!isAdmin || !!myOrgId,
     queryFn: async () => {
-      let query = supabase.from("properties").select("id,name,slug,brand_color").order("name");
+      let query = supabase.from("properties").select("id,name,slug,brand_color,organization_id").order("name");
       if (!isAdmin && myOrgId) query = query.eq("organization_id", myOrgId);
       const { data } = await query;
       return data ?? [];
@@ -273,12 +273,21 @@ function AuthedLayout() {
     navigate({ to: "/auth", replace: true });
   }
 
+  // properties deliberately includes every property on the platform for
+  // site admins (see the all-properties query above), not just this
+  // org's own — correct for that purpose, but wrong to reuse directly
+  // for "does this org have multiple properties," which is what the
+  // switcher's plan gating actually needs to know. A site admin who is
+  // also (incidentally) an org admin somewhere would otherwise see the
+  // switcher regardless of that org's actual plan.
+  const myOrgPropertyCount = myOrgId ? (properties ?? []).filter((p) => p.organization_id === myOrgId).length : 0;
+
   return (
     <SidebarProvider>
       <div className="h-screen flex w-full bg-background overflow-hidden">
         <Sidebar collapsible="icon" className="border-r-0">
           <SidebarHeader className="h-16 justify-center">
-            {isOrgAdmin && properties && (properties.length > 1 || orgCanAddProperty) ? (
+            {isOrgAdmin && properties && (myOrgPropertyCount > 1 || orgCanAddProperty) ? (
               <DropdownMenu>
                 <Tooltip>
                   <TooltipTrigger asChild>
