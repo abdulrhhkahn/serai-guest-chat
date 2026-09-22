@@ -13,6 +13,7 @@ export const Route = createFileRoute("/api/staff/properties-overview")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        try {
         const authHeader = request.headers.get("Authorization");
         if (!authHeader) return new Response("Unauthorized", { status: 401 });
 
@@ -66,6 +67,13 @@ export const Route = createFileRoute("/api/staff/properties-overview")({
           .filter((p) => p.status !== "canceled");
 
         return Response.json({ properties: result });
+        } catch (e) {
+          console.error("properties-overview crashed", e);
+          return Response.json(
+            { error: e instanceof Error ? e.message : String(e) },
+            { status: 500 },
+          );
+        }
       },
     },
   },
