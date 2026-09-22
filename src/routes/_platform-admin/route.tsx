@@ -131,7 +131,7 @@ function PlatformAdminLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="h-12 flex items-center justify-between border-b border-border px-4 bg-card/50">
+      <header className="h-12 flex items-center justify-between border-b border-border px-4 bg-background">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm font-medium">
             <Shield className="h-4 w-4" />
