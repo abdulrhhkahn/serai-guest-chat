@@ -53,7 +53,12 @@ function AuthPage() {
     setCaptchaToken("");
     // Generic message regardless of whether the email exists or the
     // password was wrong — avoids confirming which accounts exist.
-    if (error) return toast.error("Invalid email or password.");
+    if (error) {
+      // Temporary — real error only visible in DevTools console, the
+      // user-facing generic message below is unchanged for security.
+      console.error("Sign-in error (diagnostic only):", error.message, error);
+      return toast.error("Invalid email or password.");
+    }
     navigate({ to: "/dashboard" });
   }
 
