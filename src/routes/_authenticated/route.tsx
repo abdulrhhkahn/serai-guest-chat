@@ -394,7 +394,7 @@ function AuthedLayout() {
         </Sidebar>
 
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          <header className="h-16 flex items-center gap-2 px-3 bg-background border-b border-border">
+          <header className="h-16 flex items-center gap-2 px-3 bg-background">
             <SidebarTrigger title="Toggle sidebar" />
             <Separator orientation="vertical" className="h-4" />
             <div className="text-sm text-muted-foreground capitalize flex-1">
