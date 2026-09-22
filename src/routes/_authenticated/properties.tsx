@@ -28,7 +28,16 @@ function PropertiesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.session?.access_token ?? ""}` },
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        let message = "Couldn't load properties";
+        try {
+          const errBody = await res.json();
+          if (errBody?.error) message = errBody.error;
+        } catch {
+          // Response wasn't JSON — fall back to the generic message.
+        }
+        throw new Error(message);
+      }
       const body = await res.json();
       return body.properties;
     },
