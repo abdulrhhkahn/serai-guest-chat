@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search } from "lucide-react";
+import { useCurrentPropertyId } from "@/lib/use-current-property";
 import { toast } from "sonner";
 import { format, isToday, isTomorrow, isYesterday } from "date-fns";
 
@@ -58,6 +59,7 @@ function dateGroupLabel(dateStr: string | null): string {
 
 function CheckinsPage() {
   const qc = useQueryClient();
+  const { data: currentPropertyId } = useCurrentPropertyId();
   const [status, setStatus] = useState<"all" | "pending" | "verified" | "completed">("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Checkin | null>(null);
@@ -65,11 +67,13 @@ function CheckinsPage() {
   const [sigUrl, setSigUrl] = useState<string | null>(null);
 
   const { data: checkins } = useQuery({
-    queryKey: ["checkins", status],
+    queryKey: ["checkins", status, currentPropertyId],
+    enabled: !!currentPropertyId,
     queryFn: async () => {
       let q = supabase
         .from("checkins")
         .select("*")
+        .eq("property_id", currentPropertyId!)
         .order("arrival_date", { ascending: true, nullsFirst: false })
         .limit(FETCH_LIMIT);
       if (status !== "all") q = q.eq("status", status);

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { deliveryLabel } from "@/lib/delivery";
+import { useCurrentPropertyId } from "@/lib/use-current-property";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
@@ -108,10 +109,17 @@ function InboxPage() {
   const [dateTo, setDateTo] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const { data: currentPropertyId } = useCurrentPropertyId();
+
   const { data: conversations } = useQuery({
-    queryKey: ["conversations"],
+    queryKey: ["conversations", currentPropertyId],
+    enabled: !!currentPropertyId,
     queryFn: async () => {
-      const { data } = await supabase.from("conversations").select("*").order("last_message_at", { ascending: false, nullsFirst: false });
+      const { data } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("property_id", currentPropertyId!)
+        .order("last_message_at", { ascending: false, nullsFirst: false });
       return (data ?? []) as Conversation[];
     },
   });
