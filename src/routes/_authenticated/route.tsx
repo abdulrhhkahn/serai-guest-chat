@@ -364,16 +364,6 @@ function AuthedLayout() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
-                  {isOrgAdmin && (
-                    <SidebarMenuItem key="/organization">
-                      <SidebarMenuButton asChild isActive={pathname === "/organization"} tooltip="Organisation">
-                        <Link to={"/organization" as "/settings"} className="flex items-center gap-2">
-                          <Building2 className={`h-4 w-4 ${pathname === "/organization" ? "text-brand" : ""}`} />
-                          <span>Organisation</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  )}
                   {isAdmin && (
                     <>
                       <SidebarSeparator className="my-1" />
