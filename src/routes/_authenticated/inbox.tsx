@@ -11,6 +11,7 @@ import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sparkles, Send, FileText, Users, History, AlertTriangle, Clock, CheckCircle2, Search, X, ListPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -18,7 +19,6 @@ import { formatDistanceToNow, format } from "date-fns";
 import { logActivity } from "@/lib/activity-log";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/inbox")({
   component: InboxPage,
@@ -95,6 +95,7 @@ function InboxPage() {
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [requestTitle, setRequestTitle] = useState("");
   const [requestDescription, setRequestDescription] = useState("");
+  const [requestDepartment, setRequestDepartment] = useState("");
   const [creatingRequest, setCreatingRequest] = useState(false);
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
   const [editMsgText, setEditMsgText] = useState("");
@@ -325,6 +326,7 @@ function InboxPage() {
       checkin_id: active.checkin_id,
       title: requestTitle.trim(),
       description: requestDescription.trim() || null,
+      department: requestDepartment || null,
       created_by: u.user?.id ?? null,
     });
     setCreatingRequest(false);
@@ -332,6 +334,7 @@ function InboxPage() {
     toast.success("Request created");
     setRequestTitle("");
     setRequestDescription("");
+    setRequestDepartment("");
     setRequestDialogOpen(false);
   }
 
@@ -939,6 +942,21 @@ function InboxPage() {
             <div>
               <Label className="text-xs">Title</Label>
               <Input className="mt-1" placeholder="Extra towels" value={requestTitle} onChange={(e) => setRequestTitle(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Department</Label>
+              <Select value={requestDepartment} onValueChange={setRequestDepartment}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="housekeeping">Housekeeping</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="front_desk">Front desk</SelectItem>
+                  <SelectItem value="room_service">Room service</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="text-xs">Description (optional)</Label>

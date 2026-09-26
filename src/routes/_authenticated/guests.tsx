@@ -118,10 +118,6 @@ function GuestDetailSheet({ guest, onClose }: { guest: Guest; onClose: () => voi
     },
   });
 
-  // "Previous interactions" — the conversation linked to this stay, shown
-  // read-only. A guest can have more than one conversation over time in
-  // principle, but in practice each stay's ensureGuestConversation reuses
-  // one thread per property, so this covers what actually exists.
   const { data: messages } = useQuery({
     queryKey: ["guest-messages", guest.id],
     queryFn: async (): Promise<MessageRow[]> => {

@@ -173,6 +173,46 @@ function AuthedLayout() {
     return () => { supabase.removeChannel(ch); };
   }, [property?.id, refetchUnread]);
 
+  // Same pattern as the unread-conversations badge above: a live count of
+  // requests still in "new" status (the ones nobody's picked up yet),
+  // plus a toast+sound the instant one is created — from any page, not
+  // just while already on the Requests board.
+  const { data: newRequestCount, refetch: refetchNewRequests } = useQuery({
+    queryKey: ["new-request-count", property?.id],
+    enabled: !!property?.id,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("guest_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("property_id", property!.id)
+        .eq("status", "new");
+      return count ?? 0;
+    },
+  });
+
+  useEffect(() => {
+    if (!property?.id) return;
+    const ch = supabase
+      .channel("layout-requests")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "guest_requests", filter: `property_id=eq.${property.id}` },
+        (payload) => {
+          const row = payload.new as { title?: string };
+          toast.info("New request", { description: row.title });
+          playNotificationSound();
+          refetchNewRequests();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "guest_requests", filter: `property_id=eq.${property.id}` },
+        () => refetchNewRequests(),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [property?.id, refetchNewRequests]);
+
   // Whether the property's support thread has an admin reply staff
   // haven't opened yet — powers the red dot on the chat icon. Live from
   // any page, same as the Inbox badge above, not just while the widget
@@ -360,6 +400,11 @@ function AuthedLayout() {
                           {item.to === "/inbox" && !!unreadCount && (
                             <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-medium text-destructive-foreground">
                               {unreadCount > 99 ? "99+" : unreadCount}
+                            </span>
+                          )}
+                          {item.to === "/requests" && !!newRequestCount && (
+                            <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-medium text-destructive-foreground">
+                              {newRequestCount > 99 ? "99+" : newRequestCount}
                             </span>
                           )}
                         </Link>
