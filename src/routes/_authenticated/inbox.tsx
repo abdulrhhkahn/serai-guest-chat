@@ -10,13 +10,15 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, Send, FileText, Users, History, AlertTriangle, Clock, CheckCircle2, Search, X } from "lucide-react";
+import { Sparkles, Send, FileText, Users, History, AlertTriangle, Clock, CheckCircle2, Search, X, ListPlus } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { logActivity } from "@/lib/activity-log";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/inbox")({
   component: InboxPage,
@@ -90,6 +92,10 @@ function InboxPage() {
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [requestTitle, setRequestTitle] = useState("");
+  const [requestDescription, setRequestDescription] = useState("");
+  const [creatingRequest, setCreatingRequest] = useState(false);
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
   const [editMsgText, setEditMsgText] = useState("");
 
@@ -309,6 +315,26 @@ function InboxPage() {
 
   // Mark a conversation handled (or reopen it). The guest's status pill listens for
   // this update over realtime and switches to "Resolved".
+  async function createRequest() {
+    if (!active || !requestTitle.trim() || creatingRequest) return;
+    setCreatingRequest(true);
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await supabase.from("guest_requests").insert({
+      property_id: active.property_id,
+      conversation_id: active.id,
+      checkin_id: active.checkin_id,
+      title: requestTitle.trim(),
+      description: requestDescription.trim() || null,
+      created_by: u.user?.id ?? null,
+    });
+    setCreatingRequest(false);
+    if (error) return toast.error(error.message);
+    toast.success("Request created");
+    setRequestTitle("");
+    setRequestDescription("");
+    setRequestDialogOpen(false);
+  }
+
   async function setResolved(conversationId: string, done: boolean) {
     const { data: u } = await supabase.auth.getUser();
     const { error } = await supabase.from("conversations").update(
@@ -505,7 +531,7 @@ function InboxPage() {
     <div className="h-full grid grid-cols-1 md:grid-cols-[360px_1fr]">
       <aside className="border-r border-border overflow-y-auto overflow-x-hidden bg-card/30">
         <div className="p-4 border-b border-border">
-          <h2 className="font-serif text-xl">Inbox</h2>
+          <h2 className="font-serif text-xl">Conversations</h2>
           <p className="text-xs text-muted-foreground">{conversations?.length ?? 0} conversations</p>
           <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-xs">
             <button
@@ -678,6 +704,9 @@ function InboxPage() {
                     <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark resolved
                   </Button>
                 )}
+                <Button variant="outline" size="sm" onClick={() => setRequestDialogOpen(true)}>
+                  <ListPlus className="h-3.5 w-3.5 mr-1.5" /> New request
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setAuditOpen(true)}>
                   <History className="h-3.5 w-3.5 mr-1.5" /> Audit
                 </Button>
@@ -900,6 +929,30 @@ function InboxPage() {
           </>
         )}
       </section>
+
+      <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New request</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Title</Label>
+              <Input className="mt-1" placeholder="Extra towels" value={requestTitle} onChange={(e) => setRequestTitle(e.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">Description (optional)</Label>
+              <Textarea className="mt-1" placeholder="Any extra detail for whoever picks this up" value={requestDescription} onChange={(e) => setRequestDescription(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRequestDialogOpen(false)}>Cancel</Button>
+            <Button onClick={createRequest} disabled={!requestTitle.trim() || creatingRequest}>
+              {creatingRequest ? "Creating…" : "Create request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Sheet open={auditOpen} onOpenChange={setAuditOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">

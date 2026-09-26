@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect, useNavigate, Link, useRouterState } 
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarHeader, SidebarSeparator, useSidebar } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2, Table, History, MessageCircle, ChevronsUpDown } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Inbox, BookOpen, Settings, LogOut, Plus, Check, BarChart3, Building2, Table, History, MessageCircle, ChevronsUpDown, ListChecks, Users2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
@@ -29,10 +29,12 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 const nav = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { to: "/checkins", label: "Check-ins", icon: ClipboardList },
-  { to: "/inbox", label: "Inbox", icon: Inbox },
   { to: "/knowledge", label: "AI Concierge", icon: BookOpen },
+  { to: "/inbox", label: "Conversations", icon: Inbox },
+  { to: "/requests", label: "Requests", icon: ListChecks },
+  { to: "/guests", label: "Guests", icon: Users2 },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
