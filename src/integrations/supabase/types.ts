@@ -484,6 +484,7 @@ export type Database = {
           conversation_id: string | null
           created_at: string
           created_by: string | null
+          department: string | null
           description: string | null
           id: string
           property_id: string
@@ -497,6 +498,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string
           created_by?: string | null
+          department?: string | null
           description?: string | null
           id?: string
           property_id: string
@@ -510,6 +512,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string
           created_by?: string | null
+          department?: string | null
           description?: string | null
           id?: string
           property_id?: string
