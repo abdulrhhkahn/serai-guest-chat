@@ -242,6 +242,7 @@ export type Database = {
           id: string
           id_document_url: string | null
           num_guests: number | null
+          preferences: string | null
           property_id: string
           room: string | null
           signature_url: string | null
@@ -260,6 +261,7 @@ export type Database = {
           id?: string
           id_document_url?: string | null
           num_guests?: number | null
+          preferences?: string | null
           property_id: string
           room?: string | null
           signature_url?: string | null
@@ -278,6 +280,7 @@ export type Database = {
           id?: string
           id_document_url?: string | null
           num_guests?: number | null
+          preferences?: string | null
           property_id?: string
           room?: string | null
           signature_url?: string | null
@@ -425,6 +428,112 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "faqs_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guest_notes: {
+        Row: {
+          checkin_id: string
+          created_at: string
+          id: string
+          note: string
+          property_id: string
+          staff_id: string | null
+        }
+        Insert: {
+          checkin_id: string
+          created_at?: string
+          id?: string
+          note: string
+          property_id: string
+          staff_id?: string | null
+        }
+        Update: {
+          checkin_id?: string
+          created_at?: string
+          id?: string
+          note?: string
+          property_id?: string
+          staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_notes_checkin_id_fkey"
+            columns: ["checkin_id"]
+            isOneToOne: false
+            referencedRelation: "checkins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_notes_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guest_requests: {
+        Row: {
+          assigned_to: string | null
+          checkin_id: string | null
+          conversation_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          property_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          checkin_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          property_id: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          checkin_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          property_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_requests_checkin_id_fkey"
+            columns: ["checkin_id"]
+            isOneToOne: false
+            referencedRelation: "checkins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_requests_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guest_requests_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
